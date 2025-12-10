@@ -19,6 +19,14 @@ import guavaImage from './assets/images/pictures/guava.png'
 import delightImage from './assets/images/pictures/delight.png'
 import avocadoImage from './assets/images/pictures/avocado.png'
 import honeyImage from './assets/images/pictures/honey.png'
+import fruitsComboImage from './assets/images/products/fruits.png'
+import vegetablePackImage from './assets/images/products/vegies.png'
+import staplesKitImage from './assets/images/products/grains.png'
+import dairyPackImage from './assets/images/products/milk.png'
+import snacksComboImage from './assets/images/products/munchies.png'
+import breakfastImage from './assets/images/products/breakfast.png'
+import healthKitImage from './assets/images/products/health.png'
+import bakeryImage from './assets/images/products/bakery.png'
 
 function App() {
   const [timeLeft, setTimeLeft] = useState({
@@ -450,6 +458,169 @@ function App() {
             </div>
             
             <button className="hot-deal-btn">SHOP NOW</button>
+          </div>
+        </div>
+      </section>
+
+      {/* Featured Products Section */}
+      <section className="featured-products">
+        <div className="featured-products-container">
+          <h2 className="featured-products-title">Featured Products</h2>
+          
+          <div className="featured-grid">
+            {/* Row 1 */}
+            <div className="featured-card">
+              <div className="featured-image-wrapper">
+                <img src={fruitsComboImage} alt="Fresh Fruits Combo" className="featured-image" />
+                <span className="featured-badge badge-new">NEW</span>
+              </div>
+              <h3 className="featured-name">Fresh Fruits Combo</h3>
+              <div className="featured-rating">
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <div className="featured-price">
+                <span className="current-price">$118.26</span>
+                <span className="original-price">$162.00</span>
+              </div>
+            </div>
+
+            <div className="featured-card">
+              <div className="featured-image-wrapper">
+                <img src={vegetablePackImage} alt="Vegetable Essentials Pack" className="featured-image" />
+                <span className="featured-badge badge-new">NEW</span>
+              </div>
+              <h3 className="featured-name">Vegetable Essentials Pack</h3>
+              <div className="featured-rating">
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <div className="featured-price">
+                <span className="current-price">$68.00</span>
+                <span className="original-price">$85.00</span>
+              </div>
+            </div>
+
+            <div className="featured-card">
+              <div className="featured-image-wrapper">
+                <img src={staplesKitImage} alt="Organic Staples Kit" className="featured-image" />
+                <span className="featured-badge badge-hot">HOT</span>
+              </div>
+              <h3 className="featured-name">Organic Staples Kit</h3>
+              <div className="featured-rating">
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <div className="featured-price">
+                <span className="current-price">$73.60</span>
+                <span className="original-price">$92.00</span>
+              </div>
+            </div>
+
+            <div className="featured-card">
+              <div className="featured-image-wrapper">
+                <img src={dairyPackImage} alt="Dairy Delight Pack" className="featured-image" />
+                <span className="featured-badge badge-new">NEW</span>
+              </div>
+              <h3 className="featured-name">Dairy Delight Pack</h3>
+              <div className="featured-rating">
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <div className="featured-price">
+                <span className="current-price">$58.50</span>
+                <span className="original-price">$78.00</span>
+              </div>
+            </div>
+
+            {/* Row 2 */}
+            <div className="featured-card">
+              <div className="featured-image-wrapper">
+                <img src={snacksComboImage} alt="Snacks & Munchies Combo" className="featured-image" />
+                <span className="featured-badge badge-new">NEW</span>
+              </div>
+              <h3 className="featured-name">Snacks & Munchies Combo</h3>
+              <div className="featured-rating">
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <div className="featured-price">
+                <span className="current-price">$68.00</span>
+                <span className="original-price">$85.00</span>
+              </div>
+            </div>
+
+            <div className="featured-card">
+              <div className="featured-image-wrapper">
+                <img src={breakfastImage} alt="Breakfast Essentials" className="featured-image" />
+                <span className="featured-badge badge-hot">HOT</span>
+              </div>
+              <h3 className="featured-name">Breakfast Essentials</h3>
+              <div className="featured-rating">
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <div className="featured-price">
+                <span className="current-price">$73.60</span>
+                <span className="original-price">$92.00</span>
+              </div>
+            </div>
+
+            <div className="featured-card">
+              <div className="featured-image-wrapper">
+                <img src={healthKitImage} alt="Healthy Living Kit" className="featured-image" />
+                <span className="featured-badge badge-new">NEW</span>
+              </div>
+              <h3 className="featured-name">Healthy Living Kit</h3>
+              <div className="featured-rating">
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <div className="featured-price">
+                <span className="current-price">$58.50</span>
+                <span className="original-price">$78.00</span>
+              </div>
+            </div>
+
+            <div className="featured-card">
+              <div className="featured-image-wrapper">
+                <img src={bakeryImage} alt="Bakery Favorites" className="featured-image" />
+                <span className="featured-badge badge-sell">SELL -25%</span>
+              </div>
+              <h3 className="featured-name">Bakery Favorites</h3>
+              <div className="featured-rating">
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <div className="featured-price">
+                <span className="current-price">$135.00</span>
+                <span className="original-price">$180.00</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
