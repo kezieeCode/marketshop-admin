@@ -27,6 +27,9 @@ import snacksComboImage from './assets/images/products/munchies.png'
 import breakfastImage from './assets/images/products/breakfast.png'
 import healthKitImage from './assets/images/products/health.png'
 import bakeryImage from './assets/images/products/bakery.png'
+import plantsImage from './assets/images/pictures/plants.png'
+import testimonial1Image from './assets/images/testimonials/man.png'
+import testimonial2Image from './assets/images/testimonials/second_man.png'
 
 function App() {
   const [timeLeft, setTimeLeft] = useState({
@@ -621,6 +624,139 @@ function App() {
                 <span className="original-price">$180.00</span>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Video Hero Section */}
+      <section className="video-hero">
+        <div className="video-hero-container">
+          <div className="video-wrapper">
+            <img src={plantsImage} alt="Gardening Video" className="video-placeholder" />
+            <button className="play-button">
+              <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="30" cy="30" r="30" fill="white" opacity="0.9"/>
+                <path d="M25 20L25 40L40 30L25 20Z" fill="#4CAF50"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="testimonials">
+        <div className="testimonials-container">
+          <div className="testimonials-header">
+            <p className="testimonials-label">// TESTIMONIALS</p>
+            <h2 className="testimonials-title">Clients Feedbacks.</h2>
+          </div>
+
+          <div className="testimonials-wrapper">
+            <button className="scroll-arrow scroll-arrow-left" onClick={() => {
+              const scrollContainer = document.querySelector('.testimonials-scroll');
+              if (scrollContainer) {
+                scrollContainer.scrollBy({ left: -450, behavior: 'smooth' });
+              }
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <div className="testimonials-scroll">
+            <div className="testimonial-card">
+              <div className="testimonial-image-wrapper">
+                <img src={testimonial1Image} alt="Noah Alexander" className="testimonial-image" />
+              </div>
+              <div className="testimonial-content">
+                <div className="testimonial-quote-icon">💬</div>
+                <p className="testimonial-text">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+                <div className="testimonial-author">
+                  <h4 className="testimonial-name">Noah Alexander</h4>
+                  <p className="testimonial-role">Professor</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="testimonial-card">
+              <div className="testimonial-image-wrapper">
+                <img src={testimonial2Image} alt="Jacob William" className="testimonial-image" />
+              </div>
+              <div className="testimonial-content">
+                <div className="testimonial-quote-icon">💬</div>
+                <p className="testimonial-text">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+                <div className="testimonial-author">
+                  <h4 className="testimonial-name">Jacob William</h4>
+                  <p className="testimonial-role">Founder, Browni Co.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="testimonial-card">
+              <div className="testimonial-image-wrapper">
+                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop" alt="Michael Johnson" className="testimonial-image" />
+              </div>
+              <div className="testimonial-content">
+                <div className="testimonial-quote-icon">💬</div>
+                <p className="testimonial-text">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+                <div className="testimonial-author">
+                  <h4 className="testimonial-name">Michael Johnson</h4>
+                  <p className="testimonial-role">Chef, Green Kitchen</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="testimonial-card">
+              <div className="testimonial-image-wrapper">
+                <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop" alt="Sarah Martinez" className="testimonial-image" />
+              </div>
+              <div className="testimonial-content">
+                <div className="testimonial-quote-icon">💬</div>
+                <p className="testimonial-text">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+                <div className="testimonial-author">
+                  <h4 className="testimonial-name">Sarah Martinez</h4>
+                  <p className="testimonial-role">Nutritionist</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="testimonial-card">
+              <div className="testimonial-image-wrapper">
+                <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop" alt="David Chen" className="testimonial-image" />
+              </div>
+              <div className="testimonial-content">
+                <div className="testimonial-quote-icon">💬</div>
+                <p className="testimonial-text">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+                <div className="testimonial-author">
+                  <h4 className="testimonial-name">David Chen</h4>
+                  <p className="testimonial-role">Restaurant Owner</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="testimonial-card">
+              <div className="testimonial-image-wrapper">
+                <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop" alt="Emily Rodriguez" className="testimonial-image" />
+              </div>
+              <div className="testimonial-content">
+                <div className="testimonial-quote-icon">💬</div>
+                <p className="testimonial-text">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+                <div className="testimonial-author">
+                  <h4 className="testimonial-name">Emily Rodriguez</h4>
+                  <p className="testimonial-role">Food Blogger</p>
+                </div>
+              </div>
+            </div>
+          </div>
+            <button className="scroll-arrow scroll-arrow-right" onClick={() => {
+              const scrollContainer = document.querySelector('.testimonials-scroll');
+              if (scrollContainer) {
+                scrollContainer.scrollBy({ left: 450, behavior: 'smooth' });
+              }
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
           </div>
         </div>
       </section>
