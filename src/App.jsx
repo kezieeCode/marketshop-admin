@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import './App.css'
 import logo from './assets/images/logo.png'
 import fruitsImage from './assets/images/pictures/fruits.png'
@@ -9,8 +10,52 @@ import diaryImage from './assets/images/pictures/diary.png'
 import staplesImage from './assets/images/pictures/staples.png'
 import snacksImage from './assets/images/pictures/snacks.png'
 import householdImage from './assets/images/pictures/household.png'
+import tomatoesImage from './assets/images/pictures/tomatoes.png'
+import masromImage from './assets/images/pictures/masrom.png'
+import orangeImage from './assets/images/pictures/orange.png'
+import kiwiImage from './assets/images/pictures/kiwi.png'
+import juiceImage from './assets/images/pictures/juice.png'
+import guavaImage from './assets/images/pictures/guava.png'
+import delightImage from './assets/images/pictures/delight.png'
+import avocadoImage from './assets/images/pictures/avocado.png'
+import honeyImage from './assets/images/pictures/honey.png'
 
 function App() {
+  const [timeLeft, setTimeLeft] = useState({
+    days: 676,
+    hours: 8,
+    minutes: 3,
+    seconds: 20
+  })
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        let { days, hours, minutes, seconds } = prev
+        
+        if (seconds > 0) {
+          seconds--
+        } else if (minutes > 0) {
+          minutes--
+          seconds = 59
+        } else if (hours > 0) {
+          hours--
+          minutes = 59
+          seconds = 59
+        } else if (days > 0) {
+          days--
+          hours = 23
+          minutes = 59
+          seconds = 59
+        }
+        
+        return { days, hours, minutes, seconds }
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [])
+
   return (
     <div className="App">
       {/* Header */}
@@ -186,6 +231,225 @@ function App() {
                 <img src={householdImage} alt="Household & Personal Care" className="category-image" />
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Our Trendy Products Section */}
+      <section className="trendy-products">
+        <div className="trendy-products-container">
+          <h2 className="trendy-products-title">OUR TRENDY PRODUCTS</h2>
+          
+          <nav className="products-nav">
+            <a href="#food-drinks" className="nav-link active">FOOD & DRINKS</a>
+            <span className="nav-divider">|</span>
+            <a href="#vegetables" className="nav-link">VEGETABLES</a>
+            <span className="nav-divider">|</span>
+            <a href="#dried-foods" className="nav-link">DRIED FOODS</a>
+            <span className="nav-divider">|</span>
+            <a href="#bread-cake" className="nav-link">BREAD & CAKE</a>
+            <span className="nav-divider">|</span>
+            <a href="#fish-meat" className="nav-link">FISH & MEAT</a>
+          </nav>
+
+          <div className="products-grid">
+            {/* Row 1 */}
+            <div className="product-card">
+              <div className="product-image-wrapper">
+                <img src={tomatoesImage} alt="Red Hot Tomato" className="product-image" />
+                <span className="product-badge badge-new">NEW</span>
+              </div>
+              <div className="product-rating">
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <h3 className="product-name">Red Hot Tomato</h3>
+              <div className="product-price">
+                <span className="current-price">$118.26</span>
+                <span className="original-price">$162.00</span>
+              </div>
+            </div>
+
+            <div className="product-card">
+              <div className="product-image-wrapper">
+                <img src={juiceImage} alt="Vegetables Juices" className="product-image" />
+                <span className="product-badge badge-new">NEW</span>
+              </div>
+              <div className="product-rating">
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <h3 className="product-name">Vegetables Juices</h3>
+              <div className="product-price">
+                <span className="current-price">$68.00</span>
+                <span className="original-price">$85.00</span>
+              </div>
+            </div>
+
+            <div className="product-card">
+              <div className="product-image-wrapper">
+                <img src={orangeImage} alt="Orange Fresh Juice" className="product-image" />
+                <span className="product-badge badge-hot">HOT</span>
+              </div>
+              <div className="product-rating">
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <h3 className="product-name">Orange Fresh Juice</h3>
+              <div className="product-price">
+                <span className="current-price">$73.60</span>
+                <span className="original-price">$92.00</span>
+              </div>
+            </div>
+
+            <div className="product-card">
+              <div className="product-image-wrapper">
+                <img src={delightImage} alt="Dairy Delight Pack" className="product-image" />
+                <span className="product-badge badge-new">NEW</span>
+              </div>
+              <div className="product-rating">
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <h3 className="product-name">Dairy Delight Pack</h3>
+              <div className="product-price">
+                <span className="current-price">$58.50</span>
+                <span className="original-price">$78.00</span>
+              </div>
+            </div>
+
+            {/* Row 2 */}
+            <div className="product-card">
+              <div className="product-image-wrapper">
+                <img src={avocadoImage} alt="Avocado" className="product-image" />
+                <span className="product-badge badge-new">NEW</span>
+              </div>
+              <div className="product-rating">
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <h3 className="product-name">Avocado</h3>
+              <div className="product-price">
+                <span className="current-price">$68.00</span>
+                <span className="original-price">$85.00</span>
+              </div>
+            </div>
+
+            <div className="product-card">
+              <div className="product-image-wrapper">
+                <img src={guavaImage} alt="Guava" className="product-image" />
+                <span className="product-badge badge-hot">HOT</span>
+              </div>
+              <div className="product-rating">
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <h3 className="product-name">Guava</h3>
+              <div className="product-price">
+                <span className="current-price">$73.60</span>
+                <span className="original-price">$92.00</span>
+              </div>
+            </div>
+
+            <div className="product-card">
+              <div className="product-image-wrapper">
+                <img src={masromImage} alt="Masrom" className="product-image" />
+                <span className="product-badge badge-new">NEW</span>
+              </div>
+              <div className="product-rating">
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <h3 className="product-name">Masrom</h3>
+              <div className="product-price">
+                <span className="current-price">$58.50</span>
+                <span className="original-price">$78.00</span>
+              </div>
+            </div>
+
+            <div className="product-card">
+              <div className="product-image-wrapper">
+                <img src={kiwiImage} alt="Kiwi" className="product-image" />
+                <span className="product-badge badge-sell">SELL -25%</span>
+              </div>
+              <div className="product-rating">
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star filled">★</span>
+                <span className="star">★</span>
+                <span className="star">★</span>
+              </div>
+              <h3 className="product-name">Kiwi</h3>
+              <div className="product-price">
+                <span className="current-price">$135.00</span>
+                <span className="original-price">$180.00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Hot Deal Section */}
+      <section className="hot-deal">
+        <div className="hot-deal-container">
+          <div className="hot-deal-image-wrapper">
+            <img src={honeyImage} alt="Honey Combo Package" className="hot-deal-image" />
+          </div>
+          
+          <div className="hot-deal-content">
+            <p className="hot-deal-label">// Todays Hot Deals</p>
+            <p className="hot-deal-stock">ORIGINAL STOCK</p>
+            <h2 className="hot-deal-title">HONEY COMBO PACKAGE</h2>
+            
+            <div className="countdown-timer">
+              <div className="timer-item">
+                <div className="timer-circle">
+                  <span className="timer-number">{String(timeLeft.days).padStart(3, '0')}</span>
+                </div>
+                <span className="timer-label">DAYS</span>
+              </div>
+              <div className="timer-item">
+                <div className="timer-circle">
+                  <span className="timer-number">{String(timeLeft.hours).padStart(2, '0')}</span>
+                </div>
+                <span className="timer-label">HRS</span>
+              </div>
+              <div className="timer-item">
+                <div className="timer-circle">
+                  <span className="timer-number">{String(timeLeft.minutes).padStart(2, '0')}</span>
+                </div>
+                <span className="timer-label">MINS</span>
+              </div>
+              <div className="timer-item">
+                <div className="timer-circle">
+                  <span className="timer-number">{String(timeLeft.seconds).padStart(2, '0')}</span>
+                </div>
+                <span className="timer-label">SECS</span>
+              </div>
+            </div>
+            
+            <button className="hot-deal-btn">SHOP NOW</button>
           </div>
         </div>
       </section>
