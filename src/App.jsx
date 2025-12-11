@@ -30,6 +30,14 @@ import bakeryImage from './assets/images/products/bakery.png'
 import plantsImage from './assets/images/pictures/plants.png'
 import testimonial1Image from './assets/images/testimonials/man.png'
 import testimonial2Image from './assets/images/testimonials/second_man.png'
+import blogImage1 from './assets/images/blog/firstImage.png'
+import blogImage2 from './assets/images/blog/secondImage.png'
+import blogImage3 from './assets/images/blog/thirdImage.png'
+import curatedIcon from './assets/images/vector/curated.png'
+import deliveryIcon from './assets/images/vector/delivery.png'
+import handmadeIcon from './assets/images/vector/handmade.png'
+import naturalIcon from './assets/images/vector/natural.png'
+import paymentImage from './assets/images/vector/payment.png'
 
 function App() {
   const [timeLeft, setTimeLeft] = useState({
@@ -760,6 +768,274 @@ function App() {
           </div>
         </div>
       </section>
+
+      {/* Latest Blog Section */}
+      <section className="latest-blog">
+        <div className="blog-container">
+          <h2 className="blog-title">Latest Blog</h2>
+          
+          <div className="blog-grid">
+            <article className="blog-card">
+              <div className="blog-image-wrapper">
+                <img src={blogImage1} alt="Blog Post" className="blog-image" />
+              </div>
+              <div className="blog-meta">
+                <span className="blog-meta-item">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 8C9.10457 8 10 7.10457 10 6C10 4.89543 9.10457 4 8 4C6.89543 4 6 4.89543 6 6C6 7.10457 6.89543 8 8 8Z" fill="currentColor"/>
+                    <path d="M8 9C5.79086 9 4 10.7909 4 13V15H12V13C12 10.7909 10.2091 9 8 9Z" fill="currentColor"/>
+                  </svg>
+                  by: Admin
+                </span>
+                <span className="blog-meta-item">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 2L10.5 6H13.5L10.5 9.5L11.5 13.5L8 11L4.5 13.5L5.5 9.5L2.5 6H5.5L8 2Z" fill="#4CAF50"/>
+                  </svg>
+                  Business
+                </span>
+              </div>
+              <h3 className="blog-card-title">Common Engine Oil Problems and Solutions</h3>
+              <div className="blog-footer">
+                <span className="blog-date">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="2" y="2" width="12" height="12" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M2 5H14" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M5 2V5" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M11 2V5" stroke="currentColor" strokeWidth="1.5"/>
+                  </svg>
+                  June 22, 2025
+                </span>
+                <a href="#read-more" className="blog-read-more">READ MORE</a>
+              </div>
+            </article>
+
+            <article className="blog-card">
+              <div className="blog-image-wrapper">
+                <img src={blogImage2} alt="Blog Post" className="blog-image" />
+              </div>
+              <div className="blog-meta">
+                <span className="blog-meta-item">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 8C9.10457 8 10 7.10457 10 6C10 4.89543 9.10457 4 8 4C6.89543 4 6 4.89543 6 6C6 7.10457 6.89543 8 8 8Z" fill="currentColor"/>
+                    <path d="M8 9C5.79086 9 4 10.7909 4 13V15H12V13C12 10.7909 10.2091 9 8 9Z" fill="currentColor"/>
+                  </svg>
+                  by: CEO
+                </span>
+                <span className="blog-meta-item">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 2L10.5 6H13.5L10.5 9.5L11.5 13.5L8 11L4.5 13.5L5.5 9.5L2.5 6H5.5L8 2Z" fill="#4CAF50"/>
+                  </svg>
+                  Services
+                </span>
+              </div>
+              <h3 className="blog-card-title">How and when to replace brake rotors</h3>
+              <div className="blog-footer">
+                <span className="blog-date">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="2" y="2" width="12" height="12" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M2 5H14" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M5 2V5" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M11 2V5" stroke="currentColor" strokeWidth="1.5"/>
+                  </svg>
+                  June 22, 2025
+                </span>
+                <a href="#read-more" className="blog-read-more">READ MORE</a>
+              </div>
+            </article>
+
+            <article className="blog-card">
+              <div className="blog-image-wrapper">
+                <img src={blogImage3} alt="Blog Post" className="blog-image" />
+              </div>
+              <div className="blog-meta">
+                <span className="blog-meta-item">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 8C9.10457 8 10 7.10457 10 6C10 4.89543 9.10457 4 8 4C6.89543 4 6 4.89543 6 6C6 7.10457 6.89543 8 8 8Z" fill="currentColor"/>
+                    <path d="M8 9C5.79086 9 4 10.7909 4 13V15H12V13C12 10.7909 10.2091 9 8 9Z" fill="currentColor"/>
+                  </svg>
+                  by: COO
+                </span>
+                <span className="blog-meta-item">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 2L10.5 6H13.5L10.5 9.5L11.5 13.5L8 11L4.5 13.5L5.5 9.5L2.5 6H5.5L8 2Z" fill="#4CAF50"/>
+                  </svg>
+                  Consultant
+                </span>
+              </div>
+              <h3 className="blog-card-title">Electric Car Maintenance, Servicing & re</h3>
+              <div className="blog-footer">
+                <span className="blog-date">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="2" y="2" width="12" height="12" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M2 5H14" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M5 2V5" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M11 2V5" stroke="currentColor" strokeWidth="1.5"/>
+                  </svg>
+                  June 22, 2025
+                </span>
+                <a href="#read-more" className="blog-read-more">READ MORE</a>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="footer">
+        {/* Top Features Section */}
+        <div className="footer-features">
+          <div className="footer-features-container">
+            <div className="feature-card">
+              <img src={curatedIcon} alt="Curated Products" className="feature-icon" />
+              <div className="feature-content">
+                <h4 className="feature-title">Curated Products</h4>
+                <p className="feature-description">Provide free home delivery for all product over $100</p>
+              </div>
+            </div>
+            <div className="feature-divider"></div>
+            <div className="feature-card">
+              <img src={handmadeIcon} alt="Handmade" className="feature-icon" />
+              <div className="feature-content">
+                <h4 className="feature-title">Handmade</h4>
+                <p className="feature-description">We ensure the product quality that is our main goal</p>
+              </div>
+            </div>
+            <div className="feature-divider"></div>
+            <div className="feature-card">
+              <img src={naturalIcon} alt="Natural Food" className="feature-icon" />
+              <div className="feature-content">
+                <h4 className="feature-title">Natural Food</h4>
+                <p className="feature-description">Return product within 3 days for any product you buy</p>
+              </div>
+            </div>
+            <div className="feature-divider"></div>
+            <div className="feature-card">
+              <img src={deliveryIcon} alt="Free home delivery" className="feature-icon" />
+              <div className="feature-content">
+                <h4 className="feature-title">Free home delivery</h4>
+                <p className="feature-description">We ensure the product quality that you can trust easily</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Footer Content */}
+        <div className="footer-main">
+          <div className="footer-container">
+            {/* Column 1: Brand & Contact */}
+            <div className="footer-column">
+              <div className="footer-brand">
+                <img src={logo} alt="MarketGreen Logo" className="footer-logo" />
+                <span className="footer-brand-name">
+                  <span className="footer-market">Market</span>
+                  <span className="footer-green">Green</span>
+                </span>
+              </div>
+              <p className="footer-description">
+                Grocery platform offering fresh produce, daily essentials, personalized recommendations, and seamless ordering with secure payment options.
+              </p>
+              <div className="footer-contact">
+                <div className="contact-item">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 1C5.2 1 3 3.2 3 6C3 10 8 15 8 15C8 15 13 10 13 6C13 3.2 10.8 1 8 1ZM8 8C7.1 8 6.3 7.6 5.8 7C5.3 6.4 5 5.6 5 4.7C5 3.8 5.3 3 5.8 2.4C6.3 1.8 7.1 1.5 8 1.5C8.9 1.5 9.7 1.8 10.2 2.4C10.7 3 11 3.8 11 4.7C11 5.6 10.7 6.4 10.2 7C9.7 7.6 8.9 8 8 8Z" fill="currentColor"/>
+                  </svg>
+                  <span>Brooklyn, New York, United States</span>
+                </div>
+                <div className="contact-item">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3.5 1C2.7 1 2 1.7 2 2.5V13.5C2 14.3 2.7 15 3.5 15H12.5C13.3 15 14 14.3 14 13.5V2.5C14 1.7 13.3 1 12.5 1H3.5ZM3.5 2H12.5C12.8 2 13 2.2 13 2.5V13.5C13 13.8 12.8 14 12.5 14H3.5C3.2 14 3 13.8 3 13.5V2.5C3 2.2 3.2 2 3.5 2Z" fill="currentColor"/>
+                    <path d="M7 3H9V4H7V3ZM7 5H9V6H7V5ZM7 7H9V8H7V7Z" fill="currentColor"/>
+                  </svg>
+                  <span>+0123-456789</span>
+                </div>
+                <div className="contact-item">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M2 3C2 2.4 2.4 2 3 2H13C13.6 2 14 2.4 14 3V13C14 13.6 13.6 14 13 14H3C2.4 14 2 13.6 2 13V3ZM3 3V4.5L8 7.5L13 4.5V3H3ZM13 5.5L8 8.5L3 5.5V13H13V5.5Z" fill="currentColor"/>
+                  </svg>
+                  <span>info@marketgreen.com</span>
+                </div>
+              </div>
+              <div className="footer-social">
+                <a href="#facebook" className="social-icon">f</a>
+                <a href="#twitter" className="social-icon">t</a>
+                <a href="#linkedin" className="social-icon">in</a>
+                <a href="#youtube" className="social-icon">▶</a>
+              </div>
+            </div>
+
+            {/* Column 2: Company */}
+            <div className="footer-column">
+              <h4 className="footer-column-title">Company</h4>
+              <ul className="footer-links">
+                <li><a href="#about">About</a></li>
+                <li><a href="#blog">Blog</a></li>
+                <li><a href="#products">All Products</a></li>
+                <li><a href="#locations">Locations Map</a></li>
+                <li><a href="#faq">FAQ</a></li>
+                <li><a href="#contact">Contact us</a></li>
+              </ul>
+            </div>
+
+            {/* Column 3: Services */}
+            <div className="footer-column">
+              <h4 className="footer-column-title">Services.</h4>
+              <ul className="footer-links">
+                <li><a href="#tracking">Order tracking</a></li>
+                <li><a href="#wishlist">Wish List</a></li>
+                <li><a href="#login">Login</a></li>
+                <li><a href="#account">My account</a></li>
+                <li><a href="#terms">Terms & Conditions</a></li>
+                <li><a href="#promotions">Promotional Offers</a></li>
+              </ul>
+            </div>
+
+            {/* Column 4: Customer Care */}
+            <div className="footer-column">
+              <h4 className="footer-column-title">Customer Care</h4>
+              <ul className="footer-links">
+                <li><a href="#login">Login</a></li>
+                <li><a href="#account">My account</a></li>
+                <li><a href="#wishlist">Wish List</a></li>
+                <li><a href="#tracking">Order tracking</a></li>
+                <li><a href="#faq">FAQ</a></li>
+                <li><a href="#contact">Contact us</a></li>
+              </ul>
+            </div>
+
+            {/* Column 5: Newsletter & Payment */}
+            <div className="footer-column">
+              <h4 className="footer-column-title">Newsletter</h4>
+              <p className="newsletter-description">Subscribe to our weekly Newsletter and receive updates via email.</p>
+              <div className="newsletter-form">
+                <input type="email" placeholder="Email*" className="newsletter-input" />
+                <button className="newsletter-btn">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+              <h4 className="footer-column-title payment-title">We Accept</h4>
+              <div className="payment-methods">
+                <img src={paymentImage} alt="Payment Methods" className="payment-image" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Copyright Section */}
+        <div className="footer-bottom">
+          <div className="footer-bottom-container">
+            <p className="copyright">All Rights Reserved @ <span className="footer-market">Market</span><span className="footer-green">Green</span> 2025</p>
+            <div className="footer-legal">
+              <a href="#terms">Terms & Conditions</a>
+              <span className="legal-divider">|</span>
+              <a href="#claim">Claim</a>
+              <span className="legal-divider">|</span>
+              <a href="#privacy">Privacy & Policy</a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
