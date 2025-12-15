@@ -42,6 +42,8 @@ import handmadeIcon from './assets/images/vector/handmade.png'
 import naturalIcon from './assets/images/vector/natural.png'
 import paymentImage from './assets/images/vector/payment.png'
 import ShopPage from './ShopPage.jsx'
+import AboutPage from './AboutPage.jsx'
+import ContactPage from './ContactPage.jsx'
 
 function HomePage() {
   const navigate = useNavigate()
@@ -95,11 +97,27 @@ function HomePage() {
           
           <nav className="nav">
             <a href="#home">Home</a>
-            <a href="#about">About</a>
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault()
+                navigate('/about')
+              }}
+            >
+              About
+            </a>
             <a href="#" onClick={(e) => { e.preventDefault(); navigate('/shop') }}>Shop +</a>
             <a href="#news">News +</a>
             <a href="#collections">Collections</a>
-            <a href="#contact">Contact</a>
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault()
+                navigate('/contact')
+              }}
+            >
+              Contact
+            </a>
           </nav>
           
           <div className="header-actions">
@@ -1063,7 +1081,9 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/about" element={<AboutPage />} />
       <Route path="/shop" element={<ShopPage />} />
+      <Route path="/contact" element={<ContactPage />} />
       <Route path="/product/:id" element={<ProductDetail />} />
     </Routes>
   )

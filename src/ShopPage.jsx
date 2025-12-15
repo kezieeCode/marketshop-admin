@@ -32,6 +32,16 @@ function ShopPage() {
     navigate('/')
   }
 
+  const handleNavigateAbout = (e) => {
+    e.preventDefault()
+    navigate('/about')
+  }
+
+  const handleNavigateContact = (e) => {
+    e.preventDefault()
+    navigate('/contact')
+  }
+
   const handleNavigateShop = (e) => {
     e.preventDefault()
     navigate('/shop')
@@ -52,11 +62,11 @@ function ShopPage() {
 
           <nav className="nav">
             <a href="#" onClick={handleNavigateHome}>Home</a>
-            <a href="#about">About</a>
+            <a href="#" onClick={handleNavigateAbout}>About</a>
             <a href="#" className="active" onClick={handleNavigateShop}>Shop +</a>
             <a href="#news">News +</a>
             <a href="#collections">Collections</a>
-            <a href="#contact">Contact</a>
+            <a href="#" onClick={handleNavigateContact}>Contact</a>
           </nav>
 
           <div className="header-actions">
