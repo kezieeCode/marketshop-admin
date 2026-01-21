@@ -1,8 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 import logo from './assets/images/logo.png'
+import LoginPage from './views/pages/LoginPage.jsx'
+import AddProductPage from './views/pages/AddProductPage.jsx'
+import { API_CONFIG } from './config/api.js'
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [activeMenu, setActiveMenu] = useState('dashboard')
   const [orderTab, setOrderTab] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
@@ -10,6 +15,322 @@ function App() {
   const [customerChartPeriod, setCustomerChartPeriod] = useState('this-week')
   const [categoryProductTab, setCategoryProductTab] = useState('all')
   const [categoryPage, setCategoryPage] = useState(1)
+
+  // Dashboard API state
+  const [dashboardStats, setDashboardStats] = useState(null)
+  const [dashboardLoading, setDashboardLoading] = useState(false)
+  const [dashboardError, setDashboardError] = useState(null)
+  
+  // Transactions API state
+  const [transactions, setTransactions] = useState([])
+  const [transactionsLoading, setTransactionsLoading] = useState(false)
+  const [transactionsError, setTransactionsError] = useState(null)
+
+  // Orders API state
+  const [orders, setOrders] = useState([])
+  const [ordersLoading, setOrdersLoading] = useState(false)
+  const [ordersError, setOrdersError] = useState(null)
+  const [ordersStats, setOrdersStats] = useState(null)
+
+  // Products API state
+  const [products, setProducts] = useState([])
+  const [productsLoading, setProductsLoading] = useState(false)
+  const [productsError, setProductsError] = useState(null)
+  const [categories, setCategories] = useState([])
+
+  // Best selling products API state
+  const [bestSellingProducts, setBestSellingProducts] = useState([])
+  const [bestSellingLoading, setBestSellingLoading] = useState(false)
+  const [bestSellingError, setBestSellingError] = useState(null)
+
+  // Helper function to get auth token
+  const getAuthToken = () => {
+    return localStorage.getItem('admin_token')
+  }
+
+  // Helper function to make authenticated API calls
+  const apiCall = async (endpoint, options = {}) => {
+    const token = getAuthToken()
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${API_CONFIG.baseURL}${endpoint}`, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
+    })
+
+    if (response.status === 401 || response.status === 403) {
+      // Token expired or invalid
+      handleLogout()
+      throw new Error('Authentication failed. Please log in again.')
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Request failed' }))
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+    }
+
+    return response.json()
+  }
+
+  // Check authentication on mount
+  useEffect(() => {
+    const checkAuth = () => {
+      const token = localStorage.getItem('admin_token')
+      if (token) {
+        setIsAuthenticated(true)
+      }
+      setIsLoading(false)
+    }
+    checkAuth()
+  }, [])
+
+  // Fetch dashboard stats when authenticated and on dashboard menu
+  useEffect(() => {
+    if (isAuthenticated && activeMenu === 'dashboard') {
+      fetchDashboardStats()
+      fetchTransactions()
+      fetchProducts()
+      fetchBestSellingProducts()
+    }
+  }, [isAuthenticated, activeMenu])
+
+  // Fetch orders when on orders menu
+  useEffect(() => {
+    if (isAuthenticated && activeMenu === 'orders') {
+      fetchOrders()
+      fetchOrdersStats()
+    }
+  }, [isAuthenticated, activeMenu, orderTab, currentPage])
+
+  // Fetch dashboard statistics
+  const fetchDashboardStats = async () => {
+    setDashboardLoading(true)
+    setDashboardError(null)
+    try {
+      const data = await apiCall('/api/admin/dashboard/stats?period=7days')
+      setDashboardStats(data)
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error)
+      setDashboardError(error.message)
+    } finally {
+      setDashboardLoading(false)
+    }
+  }
+
+  // Fetch transactions
+  const fetchTransactions = async () => {
+    setTransactionsLoading(true)
+    setTransactionsError(null)
+    try {
+      const data = await apiCall('/api/admin/transactions?limit=5')
+      setTransactions(data.transactions || [])
+    } catch (error) {
+      console.error('Error fetching transactions:', error)
+      setTransactionsError(error.message)
+    } finally {
+      setTransactionsLoading(false)
+    }
+  }
+
+  // Fetch orders
+  const fetchOrders = async () => {
+    setOrdersLoading(true)
+    setOrdersError(null)
+    try {
+      const status = orderTab === 'all' ? '' : orderTab
+      const offset = (currentPage - 1) * 10
+      const endpoint = `/api/admin/dashboard/orders?limit=10&offset=${offset}${status ? `&status=${status}` : ''}`
+      const data = await apiCall(endpoint)
+      setOrders(data.orders || [])
+    } catch (error) {
+      console.error('Error fetching orders:', error)
+      setOrdersError(error.message)
+    } finally {
+      setOrdersLoading(false)
+    }
+  }
+
+  // Fetch orders statistics
+  const fetchOrdersStats = async () => {
+    try {
+      const data = await apiCall('/api/admin/dashboard/stats?period=7days')
+      setOrdersStats(data)
+    } catch (error) {
+      console.error('Error fetching orders stats:', error)
+    }
+  }
+
+  // Fetch products for Add New Product section
+  const fetchProducts = async () => {
+    setProductsLoading(true)
+    setProductsError(null)
+    try {
+      // Use regular products endpoint (no admin auth needed for reading)
+      const token = getAuthToken()
+      const response = await fetch(`${API_CONFIG.baseURL}/api/products`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch products')
+      }
+      
+      const data = await response.json()
+      // Handle both array and object responses
+      const productsList = Array.isArray(data) ? data : (data.products || [])
+      setProducts(productsList.slice(0, 3)) // Show only 3 products
+      
+      // Extract unique categories from products
+      const uniqueCategories = [...new Set(productsList
+        .map(p => p.category)
+        .filter(c => c && c.trim() !== '')
+      )].slice(0, 3) // Show only 3 categories
+      
+      // Set categories from products (only if found)
+      if (uniqueCategories.length > 0) {
+        setCategories(uniqueCategories.map(cat => ({
+          name: cat,
+          image: productsList.find(p => p.category === cat)?.image_url || 
+                 'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=80&h=80&fit=crop'
+        })))
+      } else {
+        // Clear categories if none found
+        setCategories([])
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error)
+      setProductsError(error.message)
+      // Don't set default categories - let UI show "No categories available"
+      setCategories([])
+    } finally {
+      setProductsLoading(false)
+    }
+  }
+
+  // Navigate to Add Product page
+  const handleAddNewProduct = () => {
+    setActiveMenu('add-products')
+  }
+
+  // Fetch best selling products
+  const fetchBestSellingProducts = async () => {
+    setBestSellingLoading(true)
+    setBestSellingError(null)
+    try {
+      // First, get all orders with their items to calculate product sales
+      const ordersResponse = await apiCall('/api/admin/dashboard/orders?limit=1000')
+      const orders = ordersResponse.orders || []
+      
+      // Count product sales from order items
+      const productSalesMap = new Map()
+      
+      // Process each order
+      for (const order of orders) {
+        if (order.items && Array.isArray(order.items)) {
+          order.items.forEach(item => {
+            const productId = item.product_id || item.id
+            const productName = item.name || item.product_name || 'Unknown Product'
+            const quantity = parseInt(item.quantity || 1)
+            
+            if (productSalesMap.has(productId)) {
+              const existing = productSalesMap.get(productId)
+              existing.totalOrders += quantity
+            } else {
+              productSalesMap.set(productId, {
+                id: productId,
+                name: productName,
+                image_url: item.image_url || item.image || 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=48&h=48&fit=crop',
+                price: parseFloat(item.price || item.current_price || 0),
+                totalOrders: quantity,
+                stockStatus: item.stock_status || 'In Stock'
+              })
+            }
+          })
+        }
+      }
+      
+      // Convert map to array and sort by total orders (descending)
+      const bestSelling = Array.from(productSalesMap.values())
+        .sort((a, b) => b.totalOrders - a.totalOrders)
+        .slice(0, 4) // Get top 4 products
+      
+      setBestSellingProducts(bestSelling)
+    } catch (error) {
+      console.error('Error fetching best selling products:', error)
+      setBestSellingError(error.message)
+      // Fallback: try to get products and use a default order count
+      try {
+        const token = getAuthToken()
+        const response = await fetch(`${API_CONFIG.baseURL}/api/products`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` })
+          }
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          const productsList = Array.isArray(data) ? data : (data.products || [])
+          // Use first 4 products with mock order counts
+          setBestSellingProducts(productsList.slice(0, 4).map((p, index) => ({
+            id: p.id,
+            name: p.name || 'Unknown Product',
+            image_url: p.image_url || 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=48&h=48&fit=crop',
+            price: parseFloat(p.price || 0),
+            totalOrders: Math.floor(Math.random() * 500) + 50, // Mock data
+            stockStatus: p.stock_status || 'In Stock'
+          })))
+        }
+      } catch (fallbackError) {
+        console.error('Fallback fetch also failed:', fallbackError)
+      }
+    } finally {
+      setBestSellingLoading(false)
+    }
+  }
+
+  const handleLogin = (success) => {
+    if (success) {
+      setIsAuthenticated(true)
+    }
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('admin_token')
+    localStorage.removeItem('admin_refresh_token')
+    localStorage.removeItem('admin_user')
+    setIsAuthenticated(false)
+  }
+
+  // Show loading state while checking auth
+  if (isLoading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        fontSize: '1.125rem',
+        color: '#6b7280'
+      }}>
+        Loading...
+      </div>
+    )
+  }
+
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return <LoginPage onLogin={handleLogin} />
+  }
 
   return (
     <div className="admin-layout">
@@ -229,6 +550,11 @@ function App() {
                 <path d="M10 3V1M10 3C7.23858 3 5 5.23858 5 8C5 10.7614 7.23858 13 10 13M10 3C12.7614 3 15 5.23858 15 8C15 10.7614 12.7614 13 10 13M10 13V19M3 10H1M19 10H17M4.31412 4.31412L2.8999 2.8999M17.1001 17.1001L15.6859 15.6859M4.31412 15.6859L2.8999 17.1001M17.1001 2.8999L15.6859 4.31412" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
+            <button className="header-action-btn" onClick={handleLogout} title="Logout">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7.5 17.5H4.16667C3.24619 17.5 2.5 16.7538 2.5 15.8333V4.16667C2.5 3.24619 3.24619 2.5 4.16667 2.5H7.5M13.3333 14.1667L17.5 10M17.5 10L13.3333 5.83333M17.5 10H7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
             <div className="user-avatar">MG</div>
           </div>
         </header>
@@ -238,27 +564,53 @@ function App() {
         <div className="dashboard-content">
           <h1 className="dashboard-title">Dashboard</h1>
 
+          {/* Loading State */}
+          {dashboardLoading && (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+              Loading dashboard data...
+            </div>
+          )}
+
+          {/* Error State */}
+          {dashboardError && (
+            <div style={{ 
+              background: '#fef2f2', 
+              border: '1px solid #fecaca', 
+              color: '#991b1b', 
+              padding: '1rem', 
+              borderRadius: '8px',
+              marginBottom: '1.5rem'
+            }}>
+              Error loading dashboard: {dashboardError}
+            </div>
+          )}
+
           {/* KPI Cards */}
+          {dashboardStats && (
           <div className="dashboard-grid">
             <div className="kpi-card">
               <div className="kpi-card-header">
                 <div>
                   <div className="kpi-card-title">Total Sales</div>
-                  <div className="kpi-card-value">$350K</div>
+                  <div className="kpi-card-value">{dashboardStats.totalSales.formatted}</div>
                 </div>
-                <div className="kpi-card-trend up">
+                <div className={`kpi-card-trend ${dashboardStats.totalSales.changeType === 'increase' ? 'up' : 'down'}`}>
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M8 3V13M8 3L4 7M8 3L12 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    {dashboardStats.totalSales.changeType === 'increase' ? (
+                      <path d="M8 3V13M8 3L4 7M8 3L12 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    ) : (
+                      <path d="M8 13V3M8 13L4 9M8 13L12 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    )}
                   </svg>
-                  10.4%
+                  {Math.abs(dashboardStats.totalSales.change)}%
                 </div>
               </div>
               <div className="kpi-card-footer">
-                <span className="kpi-card-footer-text">Last 7 days</span>
+                <span className="kpi-card-footer-text">{dashboardStats.period.current}</span>
                 <button className="kpi-card-button">Details</button>
               </div>
               <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#9ca3af' }}>
-                Previous 7 days ($235K)
+                {dashboardStats.period.previous} ({dashboardStats.totalSales.previousFormatted})
               </div>
             </div>
 
@@ -266,21 +618,25 @@ function App() {
               <div className="kpi-card-header">
                 <div>
                   <div className="kpi-card-title">Total Orders</div>
-                  <div className="kpi-card-value">10.7K</div>
+                  <div className="kpi-card-value">{dashboardStats.totalOrders.formatted}</div>
                 </div>
-                <div className="kpi-card-trend up">
+                <div className={`kpi-card-trend ${dashboardStats.totalOrders.changeType === 'increase' ? 'up' : 'down'}`}>
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M8 3V13M8 3L4 7M8 3L12 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    {dashboardStats.totalOrders.changeType === 'increase' ? (
+                      <path d="M8 3V13M8 3L4 7M8 3L12 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    ) : (
+                      <path d="M8 13V3M8 13L4 9M8 13L12 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    )}
                   </svg>
-                  14.4%
+                  {Math.abs(dashboardStats.totalOrders.change)}%
                 </div>
               </div>
               <div className="kpi-card-footer">
-                <span className="kpi-card-footer-text">Last 7 days</span>
+                <span className="kpi-card-footer-text">{dashboardStats.period.current}</span>
                 <button className="kpi-card-button">Details</button>
               </div>
               <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#9ca3af' }}>
-                Previous 7 days (7.6k)
+                {dashboardStats.period.previous} ({dashboardStats.totalOrders.previousFormatted})
               </div>
             </div>
 
@@ -289,23 +645,28 @@ function App() {
                 <div>
                   <div className="kpi-card-title">Pending & Canceled</div>
                   <div className="kpi-card-value">
-                    <div style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.25rem' }}>509</div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>204 Pending</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.25rem' }}>{dashboardStats.pendingCanceled.total}</div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>{dashboardStats.pendingCanceled.pending} Pending</div>
                   </div>
                 </div>
-                <div className="kpi-card-trend down">
+                <div className={`kpi-card-trend ${dashboardStats.pendingCanceled.changeType === 'decrease' ? 'down' : 'up'}`}>
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M8 13V3M8 13L4 9M8 13L12 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    {dashboardStats.pendingCanceled.changeType === 'decrease' ? (
+                      <path d="M8 13V3M8 13L4 9M8 13L12 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    ) : (
+                      <path d="M8 3V13M8 3L4 7M8 3L12 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    )}
                   </svg>
-                  14.4%
+                  {Math.abs(dashboardStats.pendingCanceled.change)}%
                 </div>
               </div>
               <div className="kpi-card-footer">
-                <span className="kpi-card-footer-text">Last 7 days • 94 Canceled</span>
+                <span className="kpi-card-footer-text">{dashboardStats.period.current} • {dashboardStats.pendingCanceled.canceled} Canceled</span>
                 <button className="kpi-card-button">Details</button>
               </div>
             </div>
           </div>
+          )}
 
           {/* Charts Row */}
           <div className="dashboard-charts-grid">
@@ -320,81 +681,53 @@ function App() {
                   </svg>
                 </button>
               </div>
-              <div className="transaction-table-container">
-                <table className="transaction-table">
-                  <thead>
-                    <tr>
-                      <th>No</th>
-                      <th>Id Customer</th>
-                      <th>Order Date</th>
-                      <th>Status</th>
-                      <th>Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>1.</td>
-                      <td>#6545</td>
-                      <td>01 Oct | 11:29 am</td>
-                      <td>
-                        <span className="status-badge status-paid">
-                          <span className="status-dot"></span>
-                          Paid
-                        </span>
-                      </td>
-                      <td>$64</td>
-                    </tr>
-                    <tr>
-                      <td>2.</td>
-                      <td>#5412</td>
-                      <td>01 Oct | 11:29 am</td>
-                      <td>
-                        <span className="status-badge status-pending">
-                          <span className="status-dot"></span>
-                          Pending
-                        </span>
-                      </td>
-                      <td>$557</td>
-                    </tr>
-                    <tr>
-                      <td>3.</td>
-                      <td>#6622</td>
-                      <td>01 Oct | 11:29 am</td>
-                      <td>
-                        <span className="status-badge status-paid">
-                          <span className="status-dot"></span>
-                          Paid
-                        </span>
-                      </td>
-                      <td>$156</td>
-                    </tr>
-                    <tr>
-                      <td>4.</td>
-                      <td>#6462</td>
-                      <td>01 Oct | 11:29 am</td>
-                      <td>
-                        <span className="status-badge status-paid">
-                          <span className="status-dot"></span>
-                          Paid
-                        </span>
-                      </td>
-                      <td>$265</td>
-                    </tr>
-                    <tr>
-                      <td>5.</td>
-                      <td>#6462</td>
-                      <td>01 Oct | 11:29 am</td>
-                      <td>
-                        <span className="status-badge status-paid">
-                          <span className="status-dot"></span>
-                          Paid
-                        </span>
-                      </td>
-                      <td>$265</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              {transactionsLoading ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                  Loading transactions...
+                </div>
+              ) : transactionsError ? (
+                <div style={{ padding: '1rem', color: '#991b1b', background: '#fef2f2', borderRadius: '8px', margin: '1rem' }}>
+                  Error: {transactionsError}
+                </div>
+              ) : (
+                <div className="transaction-table-container">
+                  <table className="transaction-table">
+                    <thead>
+                      <tr>
+                        <th>No</th>
+                        <th>Id Customer</th>
+                        <th>Order Date</th>
+                        <th>Status</th>
+                        <th>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactions.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                            No transactions found
+                          </td>
+                        </tr>
+                      ) : (
+                        transactions.map((transaction) => (
+                          <tr key={transaction.id}>
+                            <td>{transaction.no}.</td>
+                            <td>{transaction.customerId}</td>
+                            <td>{transaction.orderDate}</td>
+                            <td>
+                              <span className={`status-badge status-${transaction.statusColor === 'green' ? 'paid' : transaction.statusColor === 'orange' ? 'pending' : 'paid'}`}>
+                                <span className="status-dot"></span>
+                                {transaction.status}
+                              </span>
+                            </td>
+                            <td>{transaction.amountFormatted}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               <div className="transaction-footer">
                 <button className="details-btn">Details</button>
               </div>
@@ -404,101 +737,106 @@ function App() {
             <div className="add-product-card">
               <div className="add-product-header">
                 <h2 className="add-product-title">Add New Product</h2>
-                <button className="add-new-btn">
+                <button className="add-new-btn" onClick={handleAddNewProduct}>
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="2"/>
-                    <path d="M8 5V11M5 8H11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    <path d="M8 2C4.5 2 1.73 4.11 1 7C1.73 9.89 4.5 12 8 12C11.5 12 14.27 9.89 15 7C14.27 4.11 11.5 2 8 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M8 9.5C9.38071 9.5 10.5 8.38071 10.5 7C10.5 5.61929 9.38071 4.5 8 4.5C6.61929 4.5 5.5 5.61929 5.5 7C5.5 8.38071 6.61929 9.5 8 9.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  Add New
+                  View
                 </button>
               </div>
 
               {/* Categories Section */}
               <div className="add-product-section">
                 <h3 className="section-title">Categories</h3>
-                <div className="category-list">
-                  <div className="category-item">
-                    <div className="category-icon">
-                      <img src="https://images.unsplash.com/photo-1498049794561-7780e7231661?w=80&h=80&fit=crop" alt="Electronic" />
-                    </div>
-                    <span className="category-name">Electronic</span>
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
+                {productsLoading ? (
+                  <div style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>
+                    Loading categories...
                   </div>
-                  <div className="category-item">
-                    <div className="category-icon">
-                      <img src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=80&h=80&fit=crop" alt="Fashion" />
+                ) : categories.length > 0 ? (
+                  <>
+                    <div className="category-list">
+                      {categories.map((category, index) => (
+                        <div key={index} className="category-item">
+                          <div className="category-icon">
+                            <img 
+                              src={category.image} 
+                              alt={category.name}
+                              onError={(e) => {
+                                e.target.src = 'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=80&h=80&fit=crop'
+                              }}
+                            />
+                          </div>
+                          <span className="category-name">{category.name}</span>
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                      ))}
                     </div>
-                    <span className="category-name">Fashion</span>
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
+                    <div className="see-more-link">See more</div>
+                  </>
+                ) : (
+                  <div style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>
+                    No categories available
                   </div>
-                  <div className="category-item">
-                    <div className="category-icon">
-                      <img src="https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=80&h=80&fit=crop" alt="Home" />
-                    </div>
-                    <span className="category-name">Home</span>
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                </div>
-                <div className="see-more-link">See more</div>
+                )}
               </div>
 
               {/* Product Section */}
               <div className="add-product-section">
                 <h3 className="section-title">Product</h3>
-                <div className="product-list">
-                  <div className="product-item">
-                    <div className="product-icon">
-                      <img src="https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=96&h=96&fit=crop" alt="Smart Fitness Tracker" />
-                    </div>
-                    <div className="product-info">
-                      <div className="product-name">Smart Fitness Tracker</div>
-                      <div className="product-price">$39.99</div>
-                    </div>
-                    <button className="add-product-btn">
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M7 3V11M3 7H11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                      </svg>
-                      Add
-                    </button>
+                {productsLoading ? (
+                  <div style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>
+                    Loading products...
                   </div>
-                  <div className="product-item">
-                    <div className="product-icon">
-                      <img src="https://images.unsplash.com/photo-1627123424574-724758594e93?w=96&h=96&fit=crop" alt="Leather Wallet" />
-                    </div>
-                    <div className="product-info">
-                      <div className="product-name">Leather Wallet</div>
-                      <div className="product-price">$19.99</div>
-                    </div>
-                    <button className="add-product-btn">
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M7 3V11M3 7H11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                      </svg>
-                      Add
-                    </button>
+                ) : productsError ? (
+                  <div style={{ padding: '1rem', color: '#991b1b', fontSize: '0.875rem' }}>
+                    Error loading products
                   </div>
-                  <div className="product-item">
-                    <div className="product-icon">
-                      <img src="https://images.unsplash.com/photo-1608534224940-2d84956bb4a0?w=96&h=96&fit=crop" alt="Electric Hair Trimmer" />
+                ) : products.length > 0 ? (
+                  <>
+                    <div className="product-list">
+                      {products.map((product) => {
+                        const price = new Intl.NumberFormat('en-US', {
+                          style: 'currency',
+                          currency: 'USD',
+                          minimumFractionDigits: 2
+                        }).format(parseFloat(product.price || 0))
+                        
+                        return (
+                          <div key={product.id} className="product-item">
+                            <div className="product-icon">
+                              <img 
+                                src={product.image_url || 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=96&h=96&fit=crop'} 
+                                alt={product.name}
+                                onError={(e) => {
+                                  e.target.src = 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=96&h=96&fit=crop'
+                                }}
+                              />
+                            </div>
+                            <div className="product-info">
+                              <div className="product-name">{product.name || 'Unnamed Product'}</div>
+                              <div className="product-price">{price}</div>
+                            </div>
+                            <button className="add-product-btn" onClick={() => handleAddNewProduct()}>
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M7 2C4.23858 2 2 4.23858 2 7C2 9.76142 4.23858 12 7 12C9.76142 12 12 9.76142 12 7C12 4.23858 9.76142 2 7 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M7 9.5C8.38071 9.5 9.5 8.38071 9.5 7C9.5 5.61929 8.38071 4.5 7 4.5C5.61929 4.5 4.5 5.61929 4.5 7C4.5 8.38071 5.61929 9.5 7 9.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                              View
+                            </button>
+                          </div>
+                        )
+                      })}
                     </div>
-                    <div className="product-info">
-                      <div className="product-name">Electric Hair Trimmer</div>
-                      <div className="product-price">$34.99</div>
-                    </div>
-                    <button className="add-product-btn">
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M7 3V11M3 7H11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                      </svg>
-                      Add
-                    </button>
+                    <div className="see-more-link">See more</div>
+                  </>
+                ) : (
+                  <div style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>
+                    No products available
                   </div>
-                </div>
-                <div className="see-more-link">See more</div>
+                )}
               </div>
             </div>
           </div>
@@ -514,84 +852,86 @@ function App() {
                 </svg>
               </button>
             </div>
-            <div className="best-selling-table-container">
-              <table className="best-selling-table">
-                <thead>
-                  <tr>
-                    <th>PRODUCT</th>
-                    <th>TOTAL ORDER</th>
-                    <th>STATUS</th>
-                    <th>PRICE</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>
-                      <div className="product-cell">
-                        <img src="https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=48&h=48&fit=crop" alt="Apple iPhone 13" />
-                        <span>Apple iPhone 13</span>
-                      </div>
-                    </td>
-                    <td>104</td>
-                    <td>
-                      <span className="status-badge status-stock">
-                        <span className="status-dot"></span>
-                        Stock
-                      </span>
-                    </td>
-                    <td>$999.00</td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <div className="product-cell">
-                        <img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=48&h=48&fit=crop" alt="Nike Air Jordan" />
-                        <span>Nike Air Jordan</span>
-                      </div>
-                    </td>
-                    <td>56</td>
-                    <td>
-                      <span className="status-badge status-stock-out">
-                        <span className="status-dot"></span>
-                        Stock out
-                      </span>
-                    </td>
-                    <td>$999.00</td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <div className="product-cell">
-                        <img src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=48&h=48&fit=crop" alt="T-shirt" />
-                        <span>T-shirt</span>
-                      </div>
-                    </td>
-                    <td>266</td>
-                    <td>
-                      <span className="status-badge status-stock">
-                        <span className="status-dot"></span>
-                        Stock
-                      </span>
-                    </td>
-                    <td>$999.00</td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <div className="product-cell">
-                        <img src="https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=48&h=48&fit=crop" alt="Cross Bag" />
-                        <span>Cross Bag</span>
-                      </div>
-                    </td>
-                    <td>506</td>
-                    <td>
-                      <span className="status-badge status-stock">
-                        <span className="status-dot"></span>
-                        Stock
-                      </span>
-                    </td>
-                    <td>$999.00</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            {bestSellingLoading ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                Loading best selling products...
+              </div>
+            ) : bestSellingError ? (
+              <div style={{ 
+                background: '#fef2f2', 
+                border: '1px solid #fecaca', 
+                color: '#991b1b', 
+                padding: '1rem', 
+                borderRadius: '8px',
+                margin: '1rem'
+              }}>
+                Error loading best selling products: {bestSellingError}
+              </div>
+            ) : (
+              <div className="best-selling-table-container">
+                <table className="best-selling-table">
+                  <thead>
+                    <tr>
+                      <th>PRODUCT</th>
+                      <th>TOTAL ORDER</th>
+                      <th>STATUS</th>
+                      <th>PRICE</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bestSellingProducts.length > 0 ? (
+                      bestSellingProducts.map((product) => {
+                        const price = new Intl.NumberFormat('en-US', {
+                          style: 'currency',
+                          currency: 'USD',
+                          minimumFractionDigits: 2
+                        }).format(product.price)
+                        
+                        // Determine stock status
+                        const stockStatus = product.stockStatus?.toLowerCase() || 'in stock'
+                        const statusClass = stockStatus.includes('out') ? 'status-stock-out' : 
+                                          stockStatus.includes('low') ? 'status-stock-low' : 
+                                          'status-stock'
+                        const statusLabel = stockStatus.includes('out') ? 'Stock out' :
+                                          stockStatus.includes('low') ? 'Low Stock' :
+                                          'Stock'
+                        
+                        return (
+                          <tr key={product.id}>
+                            <td>
+                              <div className="product-cell">
+                                <img 
+                                  src={product.image_url} 
+                                  alt={product.name}
+                                  onError={(e) => {
+                                    e.target.src = 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=48&h=48&fit=crop'
+                                  }}
+                                />
+                                <span>{product.name}</span>
+                              </div>
+                            </td>
+                            <td>{product.totalOrders}</td>
+                            <td>
+                              <span className={`status-badge ${statusClass}`}>
+                                <span className="status-dot"></span>
+                                {statusLabel}
+                              </span>
+                            </td>
+                            <td>{price}</td>
+                          </tr>
+                        )
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                          No best selling products found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
             <div className="best-selling-footer">
               <button className="details-btn">Details</button>
             </div>
@@ -623,7 +963,29 @@ function App() {
             </div>
           </div>
 
+          {/* Loading State */}
+          {ordersLoading && (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+              Loading orders...
+            </div>
+          )}
+
+          {/* Error State */}
+          {ordersError && (
+            <div style={{ 
+              background: '#fef2f2', 
+              border: '1px solid #fecaca', 
+              color: '#991b1b', 
+              padding: '1rem', 
+              borderRadius: '8px',
+              marginBottom: '1.5rem'
+            }}>
+              Error loading orders: {ordersError}
+            </div>
+          )}
+
           {/* Summary Cards */}
+          {ordersStats && (
           <div className="order-summary-grid">
             <div className="order-summary-card">
               <div className="order-summary-header">
@@ -636,14 +998,18 @@ function App() {
                   </svg>
                 </button>
               </div>
-              <div className="order-summary-value">1,240</div>
+              <div className="order-summary-value">{ordersStats.totalOrders.formatted}</div>
               <div className="order-summary-footer">
-                <span className="order-summary-period">Last 7 days</span>
-                <span className="order-summary-trend up">
+                <span className="order-summary-period">{ordersStats.period.current}</span>
+                <span className={`order-summary-trend ${ordersStats.totalOrders.changeType === 'increase' ? 'up' : 'down'}`}>
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 2V10M6 2L3 5M6 2L9 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    {ordersStats.totalOrders.changeType === 'increase' ? (
+                      <path d="M6 2V10M6 2L3 5M6 2L9 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    ) : (
+                      <path d="M6 10V2M6 10L3 7M6 10L9 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    )}
                   </svg>
-                  14.4%
+                  {Math.abs(ordersStats.totalOrders.change)}%
                 </span>
               </div>
             </div>
@@ -659,14 +1025,18 @@ function App() {
                   </svg>
                 </button>
               </div>
-              <div className="order-summary-value">240</div>
+              <div className="order-summary-value">{ordersStats.totalOrders.value}</div>
               <div className="order-summary-footer">
-                <span className="order-summary-period">Last 7 days</span>
-                <span className="order-summary-trend up">
+                <span className="order-summary-period">{ordersStats.period.current}</span>
+                <span className={`order-summary-trend ${ordersStats.totalOrders.changeType === 'increase' ? 'up' : 'down'}`}>
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 2V10M6 2L3 5M6 2L9 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    {ordersStats.totalOrders.changeType === 'increase' ? (
+                      <path d="M6 2V10M6 2L3 5M6 2L9 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    ) : (
+                      <path d="M6 10V2M6 10L3 7M6 10L9 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    )}
                   </svg>
-                  20%
+                  {Math.abs(ordersStats.totalOrders.change)}%
                 </span>
               </div>
             </div>
@@ -682,10 +1052,14 @@ function App() {
                   </svg>
                 </button>
               </div>
-              <div className="order-summary-value">960</div>
+              <div className="order-summary-value">{ordersStats.totalOrders.value - ordersStats.pendingCanceled.total}</div>
               <div className="order-summary-footer">
-                <span className="order-summary-period">Last 7 days</span>
-                <span className="order-summary-trend">85%</span>
+                <span className="order-summary-period">{ordersStats.period.current}</span>
+                <span className="order-summary-trend">
+                  {ordersStats.totalOrders.value > 0 
+                    ? Math.round(((ordersStats.totalOrders.value - ordersStats.pendingCanceled.total) / ordersStats.totalOrders.value) * 100)
+                    : 0}%
+                </span>
               </div>
             </div>
 
@@ -700,18 +1074,23 @@ function App() {
                   </svg>
                 </button>
               </div>
-              <div className="order-summary-value">87</div>
+              <div className="order-summary-value">{ordersStats.pendingCanceled.canceled}</div>
               <div className="order-summary-footer">
-                <span className="order-summary-period">Last 7 days</span>
-                <span className="order-summary-trend down">
+                <span className="order-summary-period">{ordersStats.period.current}</span>
+                <span className={`order-summary-trend ${ordersStats.pendingCanceled.changeType === 'decrease' ? 'down' : 'up'}`}>
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 10V2M6 10L3 7M6 10L9 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    {ordersStats.pendingCanceled.changeType === 'decrease' ? (
+                      <path d="M6 10V2M6 10L3 7M6 10L9 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    ) : (
+                      <path d="M6 2V10M6 2L3 5M6 2L9 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    )}
                   </svg>
-                  5%
+                  {Math.abs(ordersStats.pendingCanceled.change)}%
                 </span>
               </div>
             </div>
           </div>
+          )}
 
           {/* Order Table Controls */}
           <div className="order-table-controls">
@@ -720,7 +1099,7 @@ function App() {
                 className={`order-tab ${orderTab === 'all' ? 'active' : ''}`}
                 onClick={() => setOrderTab('all')}
                   >
-                All order (240)
+                All order {ordersStats ? `(${ordersStats.totalOrders.value})` : ''}
                   </button>
                   <button 
                 className={`order-tab ${orderTab === 'completed' ? 'active' : ''}`}
@@ -787,116 +1166,118 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>1</td>
-                  <td>#ORD0001</td>
-                  <td>
-                    <div className="order-product-cell">
-                      <img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=40&h=40&fit=crop" alt="Wireless Bluetooth Headphones" />
-                      <span>Wireless Bluetooth Headphones</span>
-                </div>
-                  </td>
-                  <td>01-01-2025</td>
-                  <td>$49.99</td>
-                  <td>
-                    <span className="payment-badge paid">
-                      <span className="payment-dot"></span>
-                      Paid
-                    </span>
-                  </td>
-                  <td>
-                    <span className="order-status delivered">
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M11.6667 3.5L5.25 9.91667L2.33334 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      Delivered
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>1</td>
-                  <td>#ORD0001</td>
-                  <td>
-                    <div className="order-product-cell">
-                      <img src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=40&h=40&fit=crop" alt="Men's T-Shirt" />
-                      <span>Men's T-Shirt</span>
-                </div>
-                  </td>
-                  <td>01-01-2025</td>
-                  <td>$14.99</td>
-                  <td>
-                    <span className="payment-badge unpaid">
-                      <span className="payment-dot"></span>
-                      Unpaid
-                    </span>
-                  </td>
-                  <td>
-                    <span className="order-status pending">
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="2"/>
-                        <path d="M7 4V7L9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                      </svg>
-                      Pending
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>1</td>
-                  <td>#ORD0001</td>
-                  <td>
-                    <div className="order-product-cell">
-                      <img src="https://images.unsplash.com/photo-1627123424574-724758594e93?w=40&h=40&fit=crop" alt="Leather Wallet" />
-                      <span>Leather Wallet</span>
-                </div>
-                  </td>
-                  <td>01-01-2025</td>
-                  <td>$19.99</td>
-                  <td>
-                    <span className="payment-badge paid">
-                      <span className="payment-dot"></span>
-                      Paid
-                    </span>
-                  </td>
-                  <td>
-                    <span className="order-status shipped">
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M1 5L7 1L13 5V11C13 11.5304 12.7893 12.0391 12.4142 12.4142C12.0391 12.7893 11.5304 13 11 13H3C2.46957 13 1.96086 12.7893 1.58579 12.4142C1.21071 12.0391 1 11.5304 1 11V5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M5 13V7H9V13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      Shipped
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>1</td>
-                  <td>#ORD0001</td>
-                  <td>
-                    <div className="order-product-cell">
-                      <img src="https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=40&h=40&fit=crop" alt="Smartphone" />
-                      <span>Smartphone</span>
-              </div>
-                  </td>
-                  <td>01-01-2025</td>
-                  <td>$999.00</td>
-                  <td>
-                    <span className="payment-badge paid">
-                      <span className="payment-dot"></span>
-                      Paid
-                    </span>
-                  </td>
-                  <td>
-                    <span className="order-status cancelled">
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                      </svg>
-                      Cancelled
-                    </span>
-                  </td>
-                </tr>
+                {ordersLoading ? (
+                  <tr>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                      Loading orders...
+                    </td>
+                  </tr>
+                ) : ordersError ? (
+                  <tr>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#991b1b' }}>
+                      Error: {ordersError}
+                    </td>
+                  </tr>
+                ) : orders.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                      No orders found
+                    </td>
+                  </tr>
+                ) : (
+                  orders.map((order, index) => {
+                    // Format date
+                    const orderDate = new Date(order.created_at).toLocaleDateString('en-US', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric'
+                    })
+                    
+                    // Format amount
+                    const amount = new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                      minimumFractionDigits: 2
+                    }).format(parseFloat(order.total_amount || 0))
+
+                    // Get order number or ID
+                    const orderNumber = order.order_number || `#${order.id.substring(0, 8).toUpperCase()}`
+
+                    // Get first product name from items if available
+                    let productName = 'Multiple Products'
+                    let productImage = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=40&h=40&fit=crop'
+                    
+                    if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+                      productName = order.items[0].name || order.items[0].product_name || 'Product'
+                      productImage = order.items[0].image_url || productImage
+                    }
+
+                    // Status mapping
+                    const statusConfig = {
+                      'delivered': { label: 'Delivered', icon: 'check', className: 'delivered' },
+                      'shipped': { label: 'Shipped', icon: 'shipped', className: 'shipped' },
+                      'confirmed': { label: 'Confirmed', icon: 'check', className: 'delivered' },
+                      'pending': { label: 'Pending', icon: 'pending', className: 'pending' },
+                      'canceled': { label: 'Cancelled', icon: 'cancel', className: 'cancelled' },
+                      'cancelled': { label: 'Cancelled', icon: 'cancel', className: 'cancelled' }
+                    }
+                    
+                    const status = statusConfig[order.status?.toLowerCase()] || statusConfig['pending']
+                    
+                    // Payment status
+                    const paymentStatus = order.payment_status || 'pending'
+                    const isPaid = paymentStatus === 'paid'
+
+                    return (
+                      <tr key={order.id}>
+                        <td><input type="checkbox" /></td>
+                        <td>{(currentPage - 1) * 10 + index + 1}</td>
+                        <td>{orderNumber}</td>
+                        <td>
+                          <div className="order-product-cell">
+                            <img src={productImage} alt={productName} />
+                            <span>{productName}</span>
+                          </div>
+                        </td>
+                        <td>{orderDate}</td>
+                        <td>{amount}</td>
+                        <td>
+                          <span className={`payment-badge ${isPaid ? 'paid' : 'unpaid'}`}>
+                            <span className="payment-dot"></span>
+                            {isPaid ? 'Paid' : 'Unpaid'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`order-status ${status.className}`}>
+                            {status.icon === 'check' && (
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M11.6667 3.5L5.25 9.91667L2.33334 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
+                            {status.icon === 'shipped' && (
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1 5L7 1L13 5V11C13 11.5304 12.7893 12.0391 12.4142 12.4142C12.0391 12.7893 11.5304 13 11 13H3C2.46957 13 1.96086 12.7893 1.58579 12.4142C1.21071 12.0391 1 11.5304 1 11V5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M5 13V7H9V13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
+                            {status.icon === 'pending' && (
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="2"/>
+                                <path d="M7 4V7L9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                              </svg>
+                            )}
+                            {status.icon === 'cancel' && (
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                              </svg>
+                            )}
+                            {status.label}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
             </div>
@@ -1769,6 +2150,12 @@ function App() {
             </button>
           </div>
         </div>
+        )}
+
+        {activeMenu === 'add-products' && (
+          <div className="dashboard-content">
+            <AddProductPage />
+          </div>
         )}
       </main>
     </div>
