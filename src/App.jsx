@@ -175,6 +175,29 @@ function App() {
     }
   }
 
+  // Update order status
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      await apiCall(`/api/admin/orders/${orderId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: newStatus })
+      })
+      
+      // Update local state
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId ? { ...order, status: newStatus } : order
+        )
+      )
+      
+      // Show success notification (you can add a notification state if needed)
+      console.log(`Order ${orderId} status updated to ${newStatus}`)
+    } catch (error) {
+      console.error('Error updating order status:', error)
+      alert(`Failed to update order status: ${error.message}`)
+    }
+  }
+
   // Fetch products for Add New Product section
   const fetchProducts = async () => {
     setProductsLoading(true)
@@ -1225,13 +1248,27 @@ function App() {
                     const statusConfig = {
                       'delivered': { label: 'Delivered', icon: 'check', className: 'delivered' },
                       'shipped': { label: 'Shipped', icon: 'shipped', className: 'shipped' },
-                      'confirmed': { label: 'Confirmed', icon: 'check', className: 'delivered' },
+                      'processing': { label: 'Processing', icon: 'processing', className: 'processing' },
+                      'confirmed': { label: 'Confirmed', icon: 'check', className: 'confirmed' },
                       'pending': { label: 'Pending', icon: 'pending', className: 'pending' },
                       'canceled': { label: 'Cancelled', icon: 'cancel', className: 'cancelled' },
                       'cancelled': { label: 'Cancelled', icon: 'cancel', className: 'cancelled' }
                     }
                     
-                    const status = statusConfig[order.status?.toLowerCase()] || statusConfig['pending']
+                    const currentStatus = order.status?.toLowerCase() || 'pending'
+                    const status = statusConfig[currentStatus] || statusConfig['pending']
+                    
+                    // Get next available status in progression
+                    const getNextStatus = (current) => {
+                      const statusProgression = ['confirmed', 'processing', 'shipped', 'delivered']
+                      const currentIndex = statusProgression.indexOf(current)
+                      if (currentIndex === -1 || currentIndex === statusProgression.length - 1) {
+                        return null // No next status available
+                      }
+                      return statusProgression[currentIndex + 1]
+                    }
+                    
+                    const nextStatus = getNextStatus(currentStatus)
                     
                     // Payment status
                     const paymentStatus = order.payment_status || 'pending'
@@ -1257,31 +1294,71 @@ function App() {
                           </span>
                         </td>
                         <td>
-                          <span className={`order-status ${status.className}`}>
-                            {status.icon === 'check' && (
-                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M11.6667 3.5L5.25 9.91667L2.33334 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
+                          <div className="order-status-container">
+                            <span className={`order-status ${status.className}`}>
+                              {status.icon === 'check' && (
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M11.6667 3.5L5.25 9.91667L2.33334 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              )}
+                              {status.icon === 'shipped' && (
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M1 5L7 1L13 5V11C13 11.5304 12.7893 12.0391 12.4142 12.4142C12.0391 12.7893 11.5304 13 11 13H3C2.46957 13 1.96086 12.7893 1.58579 12.4142C1.21071 12.0391 1 11.5304 1 11V5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                  <path d="M5 13V7H9V13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              )}
+                              {status.icon === 'processing' && (
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M7 1V3M7 11V13M3 7H1M13 7H11M3.343 3.343L4.757 4.757M9.243 9.243L10.657 10.657M3.343 10.657L4.757 9.243M9.243 4.757L10.657 3.343" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                </svg>
+                              )}
+                              {status.icon === 'pending' && (
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="2"/>
+                                  <path d="M7 4V7L9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                </svg>
+                              )}
+                              {status.icon === 'cancel' && (
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                </svg>
+                              )}
+                              {status.label}
+                            </span>
+                            {currentStatus !== 'cancelled' && currentStatus !== 'canceled' && (
+                              <select
+                                className="order-status-select"
+                                value={currentStatus}
+                                onChange={(e) => {
+                                  const newStatus = e.target.value
+                                  if (newStatus !== currentStatus) {
+                                    if (window.confirm(`Change order status from "${status.label}" to "${statusConfig[newStatus]?.label}"?`)) {
+                                      updateOrderStatus(order.id, newStatus)
+                                    } else {
+                                      // Reset to current status if cancelled
+                                      e.target.value = currentStatus
+                                    }
+                                  }
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {/* Show current status and all forward progression statuses */}
+                                {['confirmed', 'processing', 'shipped', 'delivered'].map(s => {
+                                  const statusProgression = ['confirmed', 'processing', 'shipped', 'delivered']
+                                  const currentIndex = statusProgression.indexOf(currentStatus)
+                                  const optionIndex = statusProgression.indexOf(s)
+                                  
+                                  // Only show current status and statuses after it (forward progression)
+                                  if (optionIndex >= currentIndex && optionIndex !== -1) {
+                                    return (
+                                      <option key={s} value={s}>{statusConfig[s]?.label}</option>
+                                    )
+                                  }
+                                  return null
+                                })}
+                              </select>
                             )}
-                            {status.icon === 'shipped' && (
-                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M1 5L7 1L13 5V11C13 11.5304 12.7893 12.0391 12.4142 12.4142C12.0391 12.7893 11.5304 13 11 13H3C2.46957 13 1.96086 12.7893 1.58579 12.4142C1.21071 12.0391 1 11.5304 1 11V5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                <path d="M5 13V7H9V13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            )}
-                            {status.icon === 'pending' && (
-                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="2"/>
-                                <path d="M7 4V7L9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                              </svg>
-                            )}
-                            {status.icon === 'cancel' && (
-                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                              </svg>
-                            )}
-                            {status.label}
-                          </span>
+                          </div>
                         </td>
                       </tr>
                     )

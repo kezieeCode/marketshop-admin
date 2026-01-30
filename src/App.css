@@ -1336,6 +1336,13 @@
   color: #ef4444;
 }
 
+.order-status-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+
 .order-status {
   display: flex;
   align-items: center;
@@ -1356,6 +1363,16 @@
   background-color: #fffbeb;
 }
 
+.order-status.processing {
+  color: #3b82f6;
+  background-color: #eff6ff;
+}
+
+.order-status.confirmed {
+  color: #10b981;
+  background-color: #f0fdf4;
+}
+
 .order-status.shipped {
   color: #6b7280;
   background-color: #f9fafb;
@@ -1364,6 +1381,30 @@
 .order-status.cancelled {
   color: #ef4444;
   background-color: #fef2f2;
+}
+
+.order-status-select {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background-color: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 140px;
+}
+
+.order-status-select:hover {
+  border-color: #4CAF50;
+  background-color: #f9fafb;
+}
+
+.order-status-select:focus {
+  outline: none;
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
 }
 
 .order-pagination {
