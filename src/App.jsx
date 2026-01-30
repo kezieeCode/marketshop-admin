@@ -3,6 +3,7 @@ import './App.css'
 import logo from './assets/images/logo.png'
 import LoginPage from './views/pages/LoginPage.jsx'
 import AddProductPage from './views/pages/AddProductPage.jsx'
+import ProductReviewsPage from './views/pages/ProductReviewsPage.jsx'
 import { API_CONFIG } from './config/api.js'
 
 function App() {
@@ -2345,6 +2346,12 @@ function App() {
                 setActiveMenu('product-list')
               }}
             />
+          </div>
+        )}
+
+        {activeMenu === 'product-reviews' && (
+          <div className="dashboard-content">
+            <ProductReviewsPage />
           </div>
         )}
       </main>
