@@ -1042,16 +1042,16 @@ const AddProductPage = ({ productId = null, onCancel, onSuccess }) => {
                 <div className="preview-price">
                   {formData.currentPrice ? (
                     <>
-                      <span className="current-price">${parseFloat(formData.currentPrice).toFixed(2)}</span>
+                      <span className="current-price">{new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 2 }).format(parseFloat(formData.currentPrice))}</span>
                       {formData.originalPrice && parseFloat(formData.originalPrice) > parseFloat(formData.currentPrice) && (
-                        <span className="original-price">${parseFloat(formData.originalPrice).toFixed(2)}</span>
+                        <span className="original-price">{new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 2 }).format(parseFloat(formData.originalPrice))}</span>
                       )}
                       {formData.discountPercentage && (
                         <span className="discount-tag">-{parseFloat(formData.discountPercentage).toFixed(0)}%</span>
                       )}
                     </>
                   ) : (
-                    <span className="current-price">$0.00</span>
+                    <span className="current-price">{new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 2 }).format(0)}</span>
                   )}
                 </div>
                 {formData.shortDescription && (

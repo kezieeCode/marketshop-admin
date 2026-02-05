@@ -4,173 +4,138 @@ import { API_CONFIG } from '../../config/api.js'
 const ProductReviewsPage = () => {
   const [reviews, setReviews] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all') // all, approved, pending, rejected
   const [filterRating, setFilterRating] = useState('all') // all, 5, 4, 3, 2, 1
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedReviews, setSelectedReviews] = useState([])
   const [notification, setNotification] = useState(null)
-  const reviewsPerPage = 10
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const reviewsPerPage = 20
+
+  // Debounce search input
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setCurrentPage(1) // Reset to page 1 when search changes
+    }, 500)
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm])
 
   // Fetch reviews
   useEffect(() => {
     fetchReviews()
-  }, [filterStatus, filterRating])
+  }, [filterStatus, filterRating, currentPage, searchTerm])
 
   const fetchReviews = async () => {
     setIsLoading(true)
+    setError(null)
     try {
       const token = localStorage.getItem('admin_token')
       if (!token) {
         throw new Error('Authentication required')
       }
 
-      // In a real app, this would be an API call
-      // For now, using mock data
-      setTimeout(() => {
-        const mockReviews = [
-          {
-            id: 1,
-            productId: 101,
-            productName: 'Organic Fresh Tomatoes',
-            productImage: 'https://via.placeholder.com/60',
-            customerName: 'John Doe',
-            customerEmail: 'john@example.com',
-            rating: 5,
-            comment: 'Excellent quality! Very fresh and tasty. Highly recommend!',
-            status: 'approved',
-            date: '2024-01-15',
-            helpful: 12
-          },
-          {
-            id: 2,
-            productId: 102,
-            productName: 'Fresh Strawberries',
-            productImage: 'https://via.placeholder.com/60',
-            customerName: 'Jane Smith',
-            customerEmail: 'jane@example.com',
-            rating: 4,
-            comment: 'Good quality strawberries, sweet and fresh. Would buy again.',
-            status: 'approved',
-            date: '2024-01-14',
-            helpful: 8
-          },
-          {
-            id: 3,
-            productId: 103,
-            productName: 'Premium Beef Steak',
-            productImage: 'https://via.placeholder.com/60',
-            customerName: 'Mike Johnson',
-            customerEmail: 'mike@example.com',
-            rating: 5,
-            comment: 'Amazing quality meat! Very tender and flavorful.',
-            status: 'pending',
-            date: '2024-01-13',
-            helpful: 5
-          },
-          {
-            id: 4,
-            productId: 104,
-            productName: 'Fresh Salmon Fillet',
-            productImage: 'https://via.placeholder.com/60',
-            customerName: 'Sarah Williams',
-            customerEmail: 'sarah@example.com',
-            rating: 3,
-            comment: 'The fish was okay, but could be fresher. Delivery was fast though.',
-            status: 'approved',
-            date: '2024-01-12',
-            helpful: 3
-          },
-          {
-            id: 5,
-            productId: 105,
-            productName: 'Organic Avocados',
-            productImage: 'https://via.placeholder.com/60',
-            customerName: 'David Brown',
-            customerEmail: 'david@example.com',
-            rating: 2,
-            comment: 'Some avocados were overripe when they arrived. Not satisfied.',
-            status: 'rejected',
-            date: '2024-01-11',
-            helpful: 1
-          },
-          {
-            id: 6,
-            productId: 106,
-            productName: 'Fresh Milk 1L',
-            productImage: 'https://via.placeholder.com/60',
-            customerName: 'Emily Davis',
-            customerEmail: 'emily@example.com',
-            rating: 5,
-            comment: 'Perfect! Fresh and creamy. Best milk I\'ve had in a while.',
-            status: 'approved',
-            date: '2024-01-10',
-            helpful: 15
-          },
-          {
-            id: 7,
-            productId: 107,
-            productName: 'Whole Grain Bread',
-            productImage: 'https://via.placeholder.com/60',
-            customerName: 'Chris Wilson',
-            customerEmail: 'chris@example.com',
-            rating: 4,
-            comment: 'Good bread, nice texture. A bit pricey but worth it.',
-            status: 'pending',
-            date: '2024-01-09',
-            helpful: 4
-          },
-          {
-            id: 8,
-            productId: 108,
-            productName: 'Organic Spinach',
-            productImage: 'https://via.placeholder.com/60',
-            customerName: 'Lisa Anderson',
-            customerEmail: 'lisa@example.com',
-            rating: 5,
-            comment: 'Very fresh organic spinach. Great for salads!',
-            status: 'approved',
-            date: '2024-01-08',
-            helpful: 9
-          }
-        ]
+      // Build query parameters
+      const params = new URLSearchParams()
+      params.append('limit', reviewsPerPage.toString())
+      params.append('offset', ((currentPage - 1) * reviewsPerPage).toString())
+      params.append('sortBy', 'created_at')
+      params.append('sortOrder', 'desc')
 
-        let filtered = mockReviews
+      // Add filters
+      if (filterStatus !== 'all') {
+        params.append('status', filterStatus)
+      }
+      if (filterRating !== 'all') {
+        params.append('rating', filterRating)
+      }
+      if (searchTerm.trim()) {
+        params.append('search', searchTerm.trim())
+      }
 
-        // Filter by status
-        if (filterStatus !== 'all') {
-          filtered = filtered.filter(r => r.status === filterStatus)
+      // Make API call to get reviews with filters
+      const response = await fetch(`${API_CONFIG.baseURL}/api/admin/reviews?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
+      })
 
-        // Filter by rating
-        if (filterRating !== 'all') {
-          filtered = filtered.filter(r => r.rating === parseInt(filterRating))
-        }
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Authentication failed. Please log in again.')
+      }
 
-        setReviews(filtered)
-        setIsLoading(false)
-      }, 500)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Request failed' }))
+        throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log('Reviews API Response:', data)
+
+      // Handle different response formats
+      let reviewsList = []
+      if (Array.isArray(data)) {
+        reviewsList = data
+      } else if (data.reviews) {
+        reviewsList = data.reviews
+      } else if (data.data) {
+        reviewsList = data.data
+      } else {
+        reviewsList = []
+      }
+
+      // Handle pagination metadata
+      let total = reviewsList.length
+      let pages = 1
+      if (data.total !== undefined) {
+        total = data.total
+        pages = Math.ceil(total / reviewsPerPage)
+      } else if (data.totalPages !== undefined) {
+        pages = data.totalPages
+        total = data.totalCount || data.total || reviewsList.length
+      } else if (data.pagination) {
+        total = data.pagination.total || reviewsList.length
+        pages = data.pagination.totalPages || Math.ceil(total / reviewsPerPage)
+      }
+
+      setTotalCount(total)
+      setTotalPages(pages)
+
+      // Map API response to match expected format
+      const formattedReviews = reviewsList.map(review => ({
+        id: review.id || review._id || review.uuid,
+        uuid: review.uuid || review.id || review._id, // Store UUID for API calls
+        productId: review.productId || review.product_id,
+        productName: review.productName || review.product_name || review.product?.name || 'Unknown Product',
+        productImage: review.productImage || review.product_image || review.product?.image_url || review.product?.image || 'https://via.placeholder.com/60',
+        customerName: review.customerName || review.customer_name || review.customer?.name || review.user?.name || 'Unknown Customer',
+        customerEmail: review.customerEmail || review.customer_email || review.customer?.email || review.user?.email || '',
+        rating: review.rating || review.stars || 0,
+        comment: review.comment || review.review || review.text || '',
+        status: review.status || review.approval_status || 'pending',
+        date: review.date || review.createdAt || review.created_at || new Date().toISOString().split('T')[0],
+        helpful: review.helpful || review.helpful_count || 0
+      }))
+
+      setReviews(formattedReviews)
+      setIsLoading(false)
     } catch (error) {
+      console.error('Error fetching reviews:', error)
+      setError(error.message)
       setNotification({ type: 'error', message: error.message || 'Failed to load reviews' })
       setIsLoading(false)
+      setReviews([])
+      setTotalCount(0)
+      setTotalPages(1)
     }
   }
 
-  // Filter reviews by search term
-  const filteredReviews = reviews.filter(review => {
-    if (!searchTerm) return true
-    const search = searchTerm.toLowerCase()
-    return (
-      review.productName.toLowerCase().includes(search) ||
-      review.customerName.toLowerCase().includes(search) ||
-      review.comment.toLowerCase().includes(search)
-    )
-  })
-
-  // Pagination
-  const totalPages = Math.ceil(filteredReviews.length / reviewsPerPage)
-  const startIndex = (currentPage - 1) * reviewsPerPage
-  const paginatedReviews = filteredReviews.slice(startIndex, startIndex + reviewsPerPage)
+  // Reviews are already filtered by API, so use them directly
+  const paginatedReviews = reviews
 
   // Handle review status change
   const handleStatusChange = async (reviewId, newStatus) => {
@@ -180,16 +145,49 @@ const ProductReviewsPage = () => {
         throw new Error('Authentication required')
       }
 
-      // In a real app, this would be an API call
-      setReviews(prev => prev.map(r => 
-        r.id === reviewId ? { ...r, status: newStatus } : r
-      ))
+      // Find the review to get its UUID
+      const review = reviews.find(r => r.id === reviewId || r.uuid === reviewId)
+      if (!review) {
+        throw new Error('Review not found')
+      }
+
+      const reviewUuid = review.uuid || review.id
+      let endpoint = ''
+      
+      if (newStatus === 'approved') {
+        endpoint = `${API_CONFIG.baseURL}/api/admin/reviews/${reviewUuid}/approve`
+      } else if (newStatus === 'rejected') {
+        endpoint = `${API_CONFIG.baseURL}/api/admin/reviews/${reviewUuid}/reject`
+      } else {
+        throw new Error('Invalid status')
+      }
+
+      const response = await fetch(endpoint, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Authentication failed. Please log in again.')
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Request failed' }))
+        throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`)
+      }
+
+      // Refresh reviews after status change
+      await fetchReviews()
 
       setNotification({ 
         type: 'success', 
         message: `Review ${newStatus} successfully!` 
       })
     } catch (error) {
+      console.error('Error updating review status:', error)
       setNotification({ 
         type: 'error', 
         message: error.message || 'Failed to update review status' 
@@ -210,24 +208,54 @@ const ProductReviewsPage = () => {
         throw new Error('Authentication required')
       }
 
-      // In a real app, this would be an API call
-      if (action === 'approve') {
-        setReviews(prev => prev.map(r => 
-          selectedReviews.includes(r.id) ? { ...r, status: 'approved' } : r
-        ))
-        setNotification({ type: 'success', message: `${selectedReviews.length} review(s) approved!` })
-      } else if (action === 'reject') {
-        setReviews(prev => prev.map(r => 
-          selectedReviews.includes(r.id) ? { ...r, status: 'rejected' } : r
-        ))
-        setNotification({ type: 'success', message: `${selectedReviews.length} review(s) rejected!` })
-      } else if (action === 'delete') {
-        setReviews(prev => prev.filter(r => !selectedReviews.includes(r.id)))
-        setNotification({ type: 'success', message: `${selectedReviews.length} review(s) deleted!` })
-      }
+      // Get selected review UUIDs
+      const selectedReviewUuids = reviews
+        .filter(r => selectedReviews.includes(r.id))
+        .map(r => r.uuid || r.id)
+
+      // Perform bulk actions
+      const promises = selectedReviewUuids.map(async (reviewUuid) => {
+        if (action === 'approve') {
+          const response = await fetch(`${API_CONFIG.baseURL}/api/admin/reviews/${reviewUuid}/approve`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          })
+          if (!response.ok) throw new Error(`Failed to approve review ${reviewUuid}`)
+        } else if (action === 'reject') {
+          const response = await fetch(`${API_CONFIG.baseURL}/api/admin/reviews/${reviewUuid}/reject`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          })
+          if (!response.ok) throw new Error(`Failed to reject review ${reviewUuid}`)
+        } else if (action === 'delete') {
+          const response = await fetch(`${API_CONFIG.baseURL}/api/admin/reviews/${reviewUuid}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+          if (!response.ok) throw new Error(`Failed to delete review ${reviewUuid}`)
+        }
+      })
+
+      await Promise.all(promises)
+
+      // Refresh reviews after bulk action
+      await fetchReviews()
 
       setSelectedReviews([])
+      setNotification({ 
+        type: 'success', 
+        message: `${selectedReviews.length} review(s) ${action === 'delete' ? 'deleted' : action + 'd'} successfully!` 
+      })
     } catch (error) {
+      console.error('Error performing bulk action:', error)
       setNotification({ 
         type: 'error', 
         message: error.message || 'Failed to perform bulk action' 
@@ -261,9 +289,10 @@ const ProductReviewsPage = () => {
     }
   }, [notification])
 
-  // Stats
+  // Stats - Use totalCount from API for total, calculate others from current page
+  // Note: For accurate stats across all reviews, the API should provide stats endpoint
   const stats = {
-    total: reviews.length,
+    total: totalCount || reviews.length,
     approved: reviews.filter(r => r.status === 'approved').length,
     pending: reviews.filter(r => r.status === 'pending').length,
     rejected: reviews.filter(r => r.status === 'rejected').length,
@@ -517,10 +546,38 @@ const ProductReviewsPage = () => {
                       )}
                       <button
                         className="action-btn delete"
-                        onClick={() => {
+                        onClick={async () => {
                           if (window.confirm('Are you sure you want to delete this review?')) {
-                            setReviews(prev => prev.filter(r => r.id !== review.id))
-                            setNotification({ type: 'success', message: 'Review deleted successfully!' })
+                            try {
+                              const token = localStorage.getItem('admin_token')
+                              if (!token) {
+                                throw new Error('Authentication required')
+                              }
+
+                              const reviewUuid = review.uuid || review.id
+                              const response = await fetch(`${API_CONFIG.baseURL}/api/admin/reviews/${reviewUuid}`, {
+                                method: 'DELETE',
+                                headers: {
+                                  'Authorization': `Bearer ${token}`
+                                }
+                              })
+
+                              if (response.status === 401 || response.status === 403) {
+                                throw new Error('Authentication failed. Please log in again.')
+                              }
+
+                              if (!response.ok) {
+                                const errorData = await response.json().catch(() => ({ error: 'Request failed' }))
+                                throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`)
+                              }
+
+                              // Refresh reviews after deletion
+                              await fetchReviews()
+                              setNotification({ type: 'success', message: 'Review deleted successfully!' })
+                            } catch (error) {
+                              console.error('Error deleting review:', error)
+                              setNotification({ type: 'error', message: error.message || 'Failed to delete review' })
+                            }
                           }
                         }}
                         title="Delete"

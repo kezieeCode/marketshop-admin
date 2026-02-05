@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import logo from './assets/images/logo.png'
 import LoginPage from './views/pages/LoginPage.jsx'
@@ -27,6 +27,11 @@ function App() {
   const [transactions, setTransactions] = useState([])
   const [transactionsLoading, setTransactionsLoading] = useState(false)
   const [transactionsError, setTransactionsError] = useState(null)
+  const [transactionPage, setTransactionPage] = useState(1)
+  const [transactionTotalPages, setTransactionTotalPages] = useState(1)
+  const [transactionTotalCount, setTransactionTotalCount] = useState(0)
+  const [transactionSearch, setTransactionSearch] = useState('')
+  const [transactionStatusFilter, setTransactionStatusFilter] = useState('all')
 
   // Orders API state
   const [orders, setOrders] = useState([])
@@ -40,10 +45,118 @@ function App() {
   const [productsError, setProductsError] = useState(null)
   const [categories, setCategories] = useState([])
 
+  // Categories page API state
+  const [categoryProducts, setCategoryProducts] = useState([])
+  const [categoryProductsLoading, setCategoryProductsLoading] = useState(false)
+  const [categoryProductsError, setCategoryProductsError] = useState(null)
+  const [categoryProductCounts, setCategoryProductCounts] = useState({
+    all: 0,
+    featured: 0,
+    onSale: 0,
+    outOfStock: 0
+  })
+  const [discoverCategories, setDiscoverCategories] = useState([])
+  const [discoverCategoriesLoading, setDiscoverCategoriesLoading] = useState(false)
+  const [categorySearch, setCategorySearch] = useState('')
+  const [categoryLimit] = useState(50)
+  const [categoryOffset, setCategoryOffset] = useState(0)
+  const [categoryTotalCount, setCategoryTotalCount] = useState(0)
+
   // Best selling products API state
   const [bestSellingProducts, setBestSellingProducts] = useState([])
   const [bestSellingLoading, setBestSellingLoading] = useState(false)
   const [bestSellingError, setBestSellingError] = useState(null)
+
+  // Customer API state
+  const [customerMetrics, setCustomerMetrics] = useState(null)
+  const [customerMetricsLoading, setCustomerMetricsLoading] = useState(false)
+  const [customerMetricsError, setCustomerMetricsError] = useState(null)
+  const [customerOverview, setCustomerOverview] = useState(null)
+  const [customerOverviewLoading, setCustomerOverviewLoading] = useState(false)
+  const [customerOverviewError, setCustomerOverviewError] = useState(null)
+  const [customers, setCustomers] = useState([])
+  const [customersLoading, setCustomersLoading] = useState(false)
+  const [customersError, setCustomersError] = useState(null)
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [customerStatusFilter, setCustomerStatusFilter] = useState('all')
+  const [customerSortBy, setCustomerSortBy] = useState('order_count')
+  const [customerSortOrder, setCustomerSortOrder] = useState('desc')
+  const [customerTotalPages, setCustomerTotalPages] = useState(1)
+  const [customerTotalCount, setCustomerTotalCount] = useState(0)
+  const [selectedCustomer, setSelectedCustomer] = useState(null)
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false)
+  
+  // Order status update modal state
+  const [isOrderStatusModalOpen, setIsOrderStatusModalOpen] = useState(false)
+  const [orderStatusUpdate, setOrderStatusUpdate] = useState({
+    orderId: null,
+    currentStatus: '',
+    newStatus: '',
+    trackingNumber: '',
+    notes: ''
+  })
+
+  // Coupon state
+  const [coupons, setCoupons] = useState([])
+  const [couponsLoading, setCouponsLoading] = useState(false)
+  const [couponsError, setCouponsError] = useState(null)
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false)
+  const [selectedCoupon, setSelectedCoupon] = useState(null)
+  const [couponFormData, setCouponFormData] = useState({
+    code: '',
+    description: '',
+    discountType: 'percentage', // 'percentage' or 'fixed'
+    discountValue: '',
+    minPurchase: '',
+    maxDiscount: '',
+    usageLimit: '',
+    userLimit: '',
+    expiryDate: '',
+    status: 'active'
+  })
+  const [couponSubmitting, setCouponSubmitting] = useState(false)
+
+  // Promotional Banners state
+  const [promotionalBanners, setPromotionalBanners] = useState([])
+  const [promotionalBannersLoading, setPromotionalBannersLoading] = useState(false)
+  const [promotionalBannersError, setPromotionalBannersError] = useState(null)
+  const [isBannerModalOpen, setIsBannerModalOpen] = useState(false)
+  const [selectedBanner, setSelectedBanner] = useState(null)
+  const [bannerFormData, setBannerFormData] = useState({
+    title: '',
+    subtitle: '',
+    headerText: '',
+    mainTitle: '',
+    countdownDays: '',
+    countdownHours: '',
+    countdownMinutes: '',
+    countdownSeconds: '',
+    countdownEndDate: '',
+    buttonText: 'SHOP NOW',
+    buttonLink: '/products',
+    backgroundColor: '#FEF3C7',
+    productImage: '',
+    backgroundImage: '',
+    isActive: true
+  })
+  const [bannerSubmitting, setBannerSubmitting] = useState(false)
+  const [productMediaTab, setProductMediaTab] = useState('media') // 'media' or 'banners'
+
+  // Messages/Chat state
+  const [chatUsers, setChatUsers] = useState([])
+  const [chatUsersLoading, setChatUsersLoading] = useState(false)
+  const [chatUsersError, setChatUsersError] = useState(null)
+  const [selectedChatUser, setSelectedChatUser] = useState(null)
+  const [messages, setMessages] = useState({}) // { userId: [messages] }
+  const [newMessage, setNewMessage] = useState('')
+  const [sendingMessage, setSendingMessage] = useState(false)
+  const [messageSearch, setMessageSearch] = useState('')
+  const messagesEndRef = useRef(null)
+
+  // Scroll to bottom of messages
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
 
   // Helper function to get auth token
   const getAuthToken = () => {
@@ -74,7 +187,13 @@ function App() {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Request failed' }))
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+      console.error('API Error Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorData: errorData,
+        endpoint: endpoint
+      })
+      throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`)
     }
 
     return response.json()
@@ -117,6 +236,110 @@ function App() {
     }
   }, [isAuthenticated, activeMenu])
 
+  // Fetch customer data when on customers menu
+  useEffect(() => {
+    if (isAuthenticated && activeMenu === 'customers') {
+      fetchCustomerMetrics()
+      fetchCustomerOverview(customerChartPeriod)
+    }
+  }, [isAuthenticated, activeMenu, customerChartPeriod])
+
+  // Debounce search input
+  useEffect(() => {
+    if (isAuthenticated && activeMenu === 'customers') {
+      const timeoutId = setTimeout(() => {
+        setCustomerPage(1) // Reset to page 1 when search changes
+      }, 500)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [customerSearch, isAuthenticated, activeMenu])
+
+  // Fetch customers list when dependencies change
+  useEffect(() => {
+    if (isAuthenticated && activeMenu === 'customers') {
+      fetchCustomers()
+    }
+  }, [isAuthenticated, activeMenu, customerPage, customerStatusFilter, customerSortBy, customerSortOrder, customerSearch])
+
+  // Debounce transaction search input
+  useEffect(() => {
+    if (isAuthenticated && activeMenu === 'transaction') {
+      const timeoutId = setTimeout(() => {
+        setTransactionPage(1) // Reset to page 1 when search changes
+      }, 500)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [transactionSearch, isAuthenticated, activeMenu])
+
+  // Fetch transactions when on transaction menu
+  useEffect(() => {
+    if (isAuthenticated && activeMenu === 'transaction') {
+      fetchTransactionsPage()
+    }
+  }, [isAuthenticated, activeMenu, transactionPage, transactionStatusFilter, transactionSearch])
+
+  // Fetch categories page data when on categories menu
+  useEffect(() => {
+    if (isAuthenticated && activeMenu === 'categories') {
+      fetchCategoryProductCounts()
+      fetchDiscoverCategories()
+    }
+  }, [isAuthenticated, activeMenu])
+
+  // Debounce category search input
+  useEffect(() => {
+    if (isAuthenticated && activeMenu === 'categories') {
+      const timeoutId = setTimeout(() => {
+        setCategoryOffset(0) // Reset to first page when search changes
+      }, 500)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [categorySearch, isAuthenticated, activeMenu])
+
+  // Fetch category products when dependencies change
+  useEffect(() => {
+    if (isAuthenticated && activeMenu === 'categories') {
+      const offset = (categoryPage - 1) * categoryLimit
+      setCategoryOffset(offset)
+      fetchCategoryProducts(categoryProductTab, categorySearch, categoryLimit, offset)
+    }
+  }, [isAuthenticated, activeMenu, categoryPage, categoryProductTab, categorySearch, categoryLimit])
+
+  // Fetch coupons when on coupon menu
+  useEffect(() => {
+    if (isAuthenticated && activeMenu === 'coupon') {
+      fetchCoupons()
+    }
+  }, [isAuthenticated, activeMenu])
+
+  // Fetch promotional banners when on product-media menu and banners tab is active
+  useEffect(() => {
+    if (isAuthenticated && activeMenu === 'product-media' && productMediaTab === 'banners') {
+      fetchPromotionalBanners()
+    }
+  }, [isAuthenticated, activeMenu, productMediaTab])
+
+  // Fetch chat users when on messages menu
+  useEffect(() => {
+    if (isAuthenticated && activeMenu === 'messages') {
+      fetchChatUsers()
+    }
+  }, [isAuthenticated, activeMenu])
+
+  // Fetch messages when a user is selected
+  useEffect(() => {
+    if (isAuthenticated && activeMenu === 'messages' && selectedChatUser) {
+      fetchMessages(selectedChatUser.id)
+    }
+  }, [isAuthenticated, activeMenu, selectedChatUser?.id])
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (selectedChatUser && messages[selectedChatUser.id]) {
+      scrollToBottom()
+    }
+  }, [messages, selectedChatUser?.id])
+
   // Fetch dashboard statistics
   const fetchDashboardStats = async () => {
     setDashboardLoading(true)
@@ -132,13 +355,56 @@ function App() {
     }
   }
 
-  // Fetch transactions
+  // Fetch transactions (for dashboard - limited to 5)
   const fetchTransactions = async () => {
     setTransactionsLoading(true)
     setTransactionsError(null)
     try {
       const data = await apiCall('/api/admin/transactions?limit=5')
       setTransactions(data.transactions || [])
+    } catch (error) {
+      console.error('Error fetching transactions:', error)
+      setTransactionsError(error.message)
+    } finally {
+      setTransactionsLoading(false)
+    }
+  }
+
+  // Fetch transactions for transaction page (with pagination and filters)
+  const fetchTransactionsPage = async () => {
+    setTransactionsLoading(true)
+    setTransactionsError(null)
+    try {
+      const limit = 20
+      const offset = (transactionPage - 1) * limit
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        offset: offset.toString()
+      })
+
+      if (transactionSearch.trim()) {
+        params.append('search', transactionSearch.trim())
+      }
+      if (transactionStatusFilter !== 'all') {
+        params.append('status', transactionStatusFilter)
+      }
+
+      const data = await apiCall(`/api/admin/transactions?${params.toString()}`)
+      console.log('Transactions Page API Response:', data)
+      
+      setTransactions(data.transactions || data || [])
+      
+      // Handle pagination metadata
+      if (data.total !== undefined) {
+        setTransactionTotalCount(data.total)
+        setTransactionTotalPages(Math.ceil(data.total / limit))
+      } else if (data.totalPages !== undefined) {
+        setTransactionTotalPages(data.totalPages)
+        setTransactionTotalCount(data.totalCount || data.total || 0)
+      } else if (data.pagination) {
+        setTransactionTotalCount(data.pagination.total || 0)
+        setTransactionTotalPages(data.pagination.totalPages || 1)
+      }
     } catch (error) {
       console.error('Error fetching transactions:', error)
       setTransactionsError(error.message)
@@ -175,26 +441,106 @@ function App() {
     }
   }
 
+  // Open order status update modal
+  const openOrderStatusModal = (orderId, currentStatus, newStatus) => {
+    setOrderStatusUpdate({
+      orderId,
+      currentStatus,
+      newStatus,
+      trackingNumber: '',
+      notes: ''
+    })
+    setIsOrderStatusModalOpen(true)
+  }
+
   // Update order status
-  const updateOrderStatus = async (orderId, newStatus) => {
+  const updateOrderStatus = async (orderId, newStatus, trackingNumber = null, notes = null) => {
     try {
+      const requestBody = { status: newStatus }
+      
+      // Add tracking number for shipped status
+      if (newStatus === 'shipped' && trackingNumber) {
+        requestBody.trackingNumber = trackingNumber.trim()
+      }
+      
+      // Add notes for canceled status
+      if (newStatus === 'canceled' && notes) {
+        requestBody.notes = notes.trim()
+      }
+
       await apiCall(`/api/admin/orders/${orderId}/status`, {
         method: 'PUT',
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify(requestBody)
       })
       
       // Update local state
       setOrders(prevOrders => 
-        prevOrders.map(order => 
-          order.id === orderId ? { ...order, status: newStatus } : order
-        )
+        prevOrders.map(order => {
+          if (order.id === orderId) {
+            const updatedOrder = { ...order, status: newStatus }
+            // Update tracking number if provided
+            if (newStatus === 'shipped' && trackingNumber) {
+              updatedOrder.tracking_number = trackingNumber.trim()
+              updatedOrder.trackingNumber = trackingNumber.trim()
+            }
+            return updatedOrder
+          }
+          return order
+        })
       )
       
-      // Show success notification (you can add a notification state if needed)
+      // Close modal and reset state
+      setIsOrderStatusModalOpen(false)
+      setOrderStatusUpdate({
+        orderId: null,
+        currentStatus: '',
+        newStatus: '',
+        trackingNumber: '',
+        notes: ''
+      })
+      
+      // Show success notification
       console.log(`Order ${orderId} status updated to ${newStatus}`)
     } catch (error) {
       console.error('Error updating order status:', error)
       alert(`Failed to update order status: ${error.message}`)
+    }
+  }
+
+  // Handle order status change with modal
+  const handleOrderStatusChange = (orderId, currentStatus, newStatus) => {
+    // If status is shipped or canceled, open modal for additional info
+    if (newStatus === 'shipped' || newStatus === 'canceled') {
+      openOrderStatusModal(orderId, currentStatus, newStatus)
+    } else {
+      // For other statuses, update directly
+      if (window.confirm(`Change order status to "${newStatus}"?`)) {
+        updateOrderStatus(orderId, newStatus)
+      }
+    }
+  }
+
+  // Delete order
+  const deleteOrder = async (orderUuid) => {
+    try {
+      await apiCall(`/api/admin/orders/${orderUuid}`, {
+        method: 'DELETE'
+      })
+      
+      // Remove order from local state (match by UUID or ID)
+      setOrders(prevOrders => prevOrders.filter(order => {
+        const orderUuidValue = order.uuid || order.id
+        return orderUuidValue !== orderUuid
+      }))
+      
+      // Refresh orders list
+      await fetchOrders()
+      
+      // Show success notification
+      console.log(`Order ${orderUuid} deleted successfully`)
+    } catch (error) {
+      console.error('Error deleting order:', error)
+      alert(`Failed to delete order: ${error.message}`)
     }
   }
 
@@ -245,6 +591,84 @@ function App() {
       setCategories([])
     } finally {
       setProductsLoading(false)
+    }
+  }
+
+  // Fetch category products with filters
+  const fetchCategoryProducts = async (filter = 'all', search = '', limit = 50, offset = 0) => {
+    setCategoryProductsLoading(true)
+    setCategoryProductsError(null)
+    try {
+      const params = new URLSearchParams()
+      
+      if (filter !== 'all') {
+        if (filter === 'featured') {
+          params.append('filter', 'featured')
+        } else if (filter === 'sale') {
+          params.append('filter', 'onSale')
+        } else if (filter === 'out-of-stock') {
+          params.append('filter', 'outOfStock')
+        }
+      } else {
+        params.append('filter', 'all')
+      }
+      
+      if (search && search.trim()) {
+        params.append('search', search.trim())
+      }
+      
+      params.append('limit', limit.toString())
+      params.append('offset', offset.toString())
+      
+      const data = await apiCall(`/api/admin/products?${params.toString()}`)
+      
+      // Handle response structure
+      const productsList = Array.isArray(data) ? data : (data.products || [])
+      setCategoryProducts(productsList)
+      setCategoryTotalCount(data.total || productsList.length)
+    } catch (error) {
+      console.error('Error fetching category products:', error)
+      setCategoryProductsError(error.message)
+      setCategoryProducts([])
+    } finally {
+      setCategoryProductsLoading(false)
+    }
+  }
+
+  // Fetch product counts for filter tabs
+  const fetchCategoryProductCounts = async () => {
+    try {
+      const data = await apiCall('/api/admin/products/counts')
+      setCategoryProductCounts({
+        all: data.all || 0,
+        featured: data.featured || 0,
+        onSale: data.onSale || 0,
+        outOfStock: data.outOfStock || 0
+      })
+    } catch (error) {
+      console.error('Error fetching product counts:', error)
+      // Set defaults on error
+      setCategoryProductCounts({
+        all: 0,
+        featured: 0,
+        onSale: 0,
+        outOfStock: 0
+      })
+    }
+  }
+
+  // Fetch categories for Discover section
+  const fetchDiscoverCategories = async () => {
+    setDiscoverCategoriesLoading(true)
+    try {
+      const data = await apiCall('/api/admin/categories')
+      const categoriesList = Array.isArray(data) ? data : (data.categories || [])
+      setDiscoverCategories(categoriesList)
+    } catch (error) {
+      console.error('Error fetching discover categories:', error)
+      setDiscoverCategories([])
+    } finally {
+      setDiscoverCategoriesLoading(false)
     }
   }
 
@@ -327,6 +751,484 @@ function App() {
       }
     } finally {
       setBestSellingLoading(false)
+    }
+  }
+
+  // Fetch customer metrics
+  const fetchCustomerMetrics = async () => {
+    setCustomerMetricsLoading(true)
+    setCustomerMetricsError(null)
+    try {
+      const data = await apiCall('/api/admin/customers/metrics')
+      console.log('Customer Metrics API Response:', data)
+      setCustomerMetrics(data)
+    } catch (error) {
+      console.error('Error fetching customer metrics:', error)
+      setCustomerMetricsError(error.message)
+    } finally {
+      setCustomerMetricsLoading(false)
+    }
+  }
+
+  // Fetch customer overview
+  const fetchCustomerOverview = async (period) => {
+    setCustomerOverviewLoading(true)
+    setCustomerOverviewError(null)
+    try {
+      const periodParam = period === 'this-week' ? 'thisWeek' : 'lastWeek'
+      const data = await apiCall(`/api/admin/customers/overview?period=${periodParam}`)
+      console.log('Customer Overview API Response:', data)
+      setCustomerOverview(data)
+    } catch (error) {
+      console.error('Error fetching customer overview:', error)
+      setCustomerOverviewError(error.message)
+    } finally {
+      setCustomerOverviewLoading(false)
+    }
+  }
+
+  // Fetch customers list
+  const fetchCustomers = async () => {
+    setCustomersLoading(true)
+    setCustomersError(null)
+    try {
+      const limit = 20
+      const offset = (customerPage - 1) * limit
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        offset: offset.toString()
+      })
+
+      if (customerSearch.trim()) {
+        params.append('search', customerSearch.trim())
+      }
+      if (customerStatusFilter !== 'all') {
+        params.append('status', customerStatusFilter)
+      }
+      if (customerSortBy) {
+        params.append('sortBy', customerSortBy)
+      }
+      if (customerSortOrder) {
+        params.append('sortOrder', customerSortOrder)
+      }
+
+      const data = await apiCall(`/api/admin/customers?${params.toString()}`)
+      console.log('Customers List API Response:', data)
+      
+      // Use exact structure from API: {customers: Array, total: number, limit: number, offset: number, hasMore: boolean}
+      setCustomers(data.customers || [])
+      
+      // Handle pagination metadata
+      if (data.total !== undefined) {
+        setCustomerTotalCount(data.total)
+        setCustomerTotalPages(Math.ceil(data.total / limit))
+      }
+    } catch (error) {
+      console.error('Error fetching customers:', error)
+      setCustomersError(error.message)
+    } finally {
+      setCustomersLoading(false)
+    }
+  }
+
+  // Fetch coupons list
+  const fetchCoupons = async () => {
+    setCouponsLoading(true)
+    setCouponsError(null)
+    try {
+      const data = await apiCall('/api/admin/coupons')
+      // Handle both array and object responses
+      const couponsList = Array.isArray(data) ? data : (data.coupons || [])
+      setCoupons(couponsList)
+    } catch (error) {
+      console.error('Error fetching coupons:', error)
+      setCouponsError(error.message)
+      setCoupons([])
+    } finally {
+      setCouponsLoading(false)
+    }
+  }
+
+  // Fetch promotional banners
+  const fetchPromotionalBanners = async () => {
+    setPromotionalBannersLoading(true)
+    setPromotionalBannersError(null)
+    try {
+      const data = await apiCall('/api/admin/promotions')
+      // Handle both array and object responses
+      const bannersList = Array.isArray(data) ? data : (data.promotions || data.banners || [])
+      setPromotionalBanners(bannersList)
+    } catch (error) {
+      console.error('Error fetching promotional banners:', error)
+      setPromotionalBannersError(error.message)
+      setPromotionalBanners([])
+    } finally {
+      setPromotionalBannersLoading(false)
+    }
+  }
+
+  // Fetch chat users (customers that can be messaged)
+  const fetchChatUsers = async () => {
+    setChatUsersLoading(true)
+    setChatUsersError(null)
+    try {
+      // Fetch customers for messaging
+      const data = await apiCall('/api/admin/customers?limit=100')
+      const usersList = data.customers || data || []
+      setChatUsers(usersList)
+    } catch (error) {
+      console.error('Error fetching chat users:', error)
+      setChatUsersError(error.message)
+      setChatUsers([])
+    } finally {
+      setChatUsersLoading(false)
+    }
+  }
+
+  // Fetch messages for a specific user
+  const fetchMessages = async (userId) => {
+    try {
+      // If messages already exist for this user, don't refetch
+      if (messages[userId] && messages[userId].length > 0) {
+        return
+      }
+      
+      // Try to fetch messages from API, or use empty array if endpoint doesn't exist
+      try {
+        const data = await apiCall(`/api/admin/messages/${userId}`)
+        const messagesList = Array.isArray(data) ? data : (data.messages || [])
+        setMessages(prev => ({
+          ...prev,
+          [userId]: messagesList
+        }))
+      } catch (apiError) {
+        // If API endpoint doesn't exist, initialize with empty array
+        console.log('Messages API not available, initializing empty messages')
+        setMessages(prev => ({
+          ...prev,
+          [userId]: []
+        }))
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', error)
+      // Initialize with empty array on error
+      setMessages(prev => ({
+        ...prev,
+        [userId]: []
+      }))
+    }
+  }
+
+  // Send a message to a user
+  const sendMessage = async () => {
+    if (!selectedChatUser || !newMessage.trim()) {
+      return
+    }
+
+    setSendingMessage(true)
+    try {
+      const messageData = {
+        userId: selectedChatUser.id,
+        message: newMessage.trim(),
+        timestamp: new Date().toISOString()
+      }
+
+      // Try to send via API, or just add locally if endpoint doesn't exist
+      try {
+        await apiCall('/api/admin/messages', {
+          method: 'POST',
+          body: JSON.stringify(messageData)
+        })
+      } catch (apiError) {
+        console.log('Send message API not available, storing locally')
+      }
+
+      // Add message to local state
+      const newMsg = {
+        id: Date.now(),
+        message: newMessage.trim(),
+        sender: 'admin',
+        receiver: selectedChatUser.id,
+        timestamp: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      }
+
+      setMessages(prev => ({
+        ...prev,
+        [selectedChatUser.id]: [...(prev[selectedChatUser.id] || []), newMsg]
+      }))
+
+      setNewMessage('')
+    } catch (error) {
+      console.error('Error sending message:', error)
+      alert('Failed to send message. Please try again.')
+    } finally {
+      setSendingMessage(false)
+    }
+  }
+
+  // Create or update promotional banner
+  const handleBannerSubmit = async () => {
+    setBannerSubmitting(true)
+    try {
+      // Validate required fields
+      if (!bannerFormData.mainTitle || !bannerFormData.mainTitle.trim()) {
+        alert('Please enter a main title')
+        setBannerSubmitting(false)
+        return
+      }
+
+      // Format countdown end date
+      let countdownEndDate = null
+      if (bannerFormData.countdownEndDate && bannerFormData.countdownEndDate.trim()) {
+        try {
+          const date = new Date(bannerFormData.countdownEndDate)
+          if (isNaN(date.getTime())) {
+            throw new Error('Invalid date format')
+          }
+          countdownEndDate = date.toISOString()
+        } catch (dateError) {
+          console.error('Date parsing error:', dateError)
+          alert('Invalid countdown end date format.')
+          setBannerSubmitting(false)
+          return
+        }
+      }
+
+      // Handle image URLs - trim whitespace and validate
+      let productImageUrl = ''
+      let backgroundImageUrl = ''
+      
+      if (bannerFormData.productImage && typeof bannerFormData.productImage === 'string') {
+        productImageUrl = bannerFormData.productImage.trim()
+      }
+      
+      if (bannerFormData.backgroundImage && typeof bannerFormData.backgroundImage === 'string') {
+        backgroundImageUrl = bannerFormData.backgroundImage.trim()
+      }
+
+      // Prepare the request body according to API structure
+      const requestBody = {
+        headerText: bannerFormData.headerText || '',
+        subtitle: bannerFormData.subtitle || '',
+        mainTitle: bannerFormData.mainTitle.trim(),
+        buttonText: bannerFormData.buttonText || 'SHOP NOW',
+        buttonLink: bannerFormData.buttonLink || '/products',
+        backgroundColor: bannerFormData.backgroundColor || '#FEF3C7',
+        isActive: bannerFormData.isActive !== false,
+        displayOrder: selectedBanner?.displayOrder || 0
+      }
+
+      // Add countdownEndDate only if provided
+      if (countdownEndDate) {
+        requestBody.countdownEndDate = countdownEndDate
+      }
+
+      // Add image URLs only if provided
+      if (productImageUrl) {
+        requestBody.productImage = productImageUrl
+      }
+      if (backgroundImageUrl) {
+        requestBody.backgroundImage = backgroundImageUrl
+      }
+
+      console.log('Sending promotion request:', requestBody)
+
+      if (selectedBanner) {
+        // Update existing promotion
+        await apiCall(`/api/admin/promotions/${selectedBanner.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(requestBody)
+        })
+        console.log('Promotion updated successfully')
+      } else {
+        // Create new promotion
+        const data = await apiCall('/api/admin/promotions', {
+          method: 'POST',
+          body: JSON.stringify(requestBody)
+        })
+        console.log('Promotion created successfully:', data)
+      }
+
+      // Close modal and refresh banners list
+      setIsBannerModalOpen(false)
+      setSelectedBanner(null)
+      
+      // Reset form
+      setBannerFormData({
+        title: '',
+        subtitle: '',
+        headerText: '',
+        mainTitle: '',
+        countdownDays: '',
+        countdownHours: '',
+        countdownMinutes: '',
+        countdownSeconds: '',
+        countdownEndDate: '',
+        buttonText: 'SHOP NOW',
+        buttonLink: '',
+        backgroundColor: '#FEF3C7',
+        productImage: null,
+        backgroundImage: null,
+        isActive: true
+      })
+
+      // Refresh banners list
+      fetchPromotionalBanners()
+    } catch (error) {
+      console.error('Error saving promotion:', error)
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      })
+      const errorMessage = error.message || 'Unknown error occurred'
+      alert(`Failed to ${selectedBanner ? 'update' : 'create'} promotion: ${errorMessage}`)
+    } finally {
+      setBannerSubmitting(false)
+    }
+  }
+
+  // Create or update coupon
+  const handleCouponSubmit = async () => {
+    setCouponSubmitting(true)
+    try {
+      // Validate required fields
+      if (!couponFormData.code || !couponFormData.code.trim()) {
+        alert('Please enter a coupon code')
+        setCouponSubmitting(false)
+        return
+      }
+
+      // Sanitize coupon code - remove spaces and special characters, keep only alphanumeric and hyphens
+      const sanitizedCode = couponFormData.code.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '')
+      if (sanitizedCode.length < 3) {
+        alert('Coupon code must be at least 3 characters long')
+        setCouponSubmitting(false)
+        return
+      }
+
+      if (!couponFormData.discountValue || parseFloat(couponFormData.discountValue) <= 0) {
+        alert('Please enter a valid discount value')
+        setCouponSubmitting(false)
+        return
+      }
+
+      // Validate percentage discount doesn't exceed 100%
+      if (couponFormData.discountType === 'percentage' && parseFloat(couponFormData.discountValue) > 100) {
+        alert('Percentage discount cannot exceed 100%')
+        setCouponSubmitting(false)
+        return
+      }
+
+      // Format expiry date properly
+      let validUntil = null
+      if (couponFormData.expiryDate && couponFormData.expiryDate.trim()) {
+        try {
+          // Ensure the date is in YYYY-MM-DD format
+          const dateStr = couponFormData.expiryDate.trim()
+          const date = new Date(dateStr + 'T23:59:59Z')
+          if (isNaN(date.getTime())) {
+            throw new Error('Invalid date format')
+          }
+          validUntil = date.toISOString()
+        } catch (dateError) {
+          console.error('Date parsing error:', dateError)
+          alert('Invalid expiry date format. Please use YYYY-MM-DD format.')
+          setCouponSubmitting(false)
+          return
+        }
+      }
+
+      // Prepare the request body according to API structure
+      const requestBody = {
+        code: sanitizedCode,
+        description: couponFormData.description || `${couponFormData.discountValue}${couponFormData.discountType === 'percentage' ? '%' : ' NGN'} off`,
+        discountType: couponFormData.discountType,
+        discountValue: parseFloat(couponFormData.discountValue),
+        minOrderAmount: couponFormData.minPurchase ? parseFloat(couponFormData.minPurchase) : 0,
+        maxDiscountAmount: couponFormData.maxDiscount ? parseFloat(couponFormData.maxDiscount) : null,
+        usageLimit: couponFormData.usageLimit ? parseInt(couponFormData.usageLimit) : null,
+        userLimit: couponFormData.userLimit ? parseInt(couponFormData.userLimit) : 1,
+        validFrom: new Date().toISOString(), // Start from now
+        validUntil: validUntil,
+        isActive: couponFormData.status === 'active'
+      }
+
+      console.log('Sending coupon request:', requestBody)
+
+      if (selectedCoupon) {
+        // Update existing coupon
+        await apiCall(`/api/admin/coupons/${selectedCoupon.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(requestBody)
+        })
+        console.log('Coupon updated successfully')
+      } else {
+        // Create new coupon
+        const data = await apiCall('/api/admin/coupons', {
+          method: 'POST',
+          body: JSON.stringify(requestBody)
+        })
+        console.log('Coupon created successfully:', data)
+      }
+
+      // Close modal and refresh coupons list
+      setIsCouponModalOpen(false)
+      setSelectedCoupon(null)
+      
+      // Reset form
+      setCouponFormData({
+        code: '',
+        description: '',
+        discountType: 'percentage',
+        discountValue: '',
+        minPurchase: '',
+        maxDiscount: '',
+        usageLimit: '',
+        userLimit: '',
+        expiryDate: '',
+        status: 'active'
+      })
+
+      // Refresh coupons list
+      fetchCoupons()
+    } catch (error) {
+      console.error('Error saving coupon:', error)
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      })
+      const errorMessage = error.message || 'Unknown error occurred'
+      alert(`Failed to ${selectedCoupon ? 'update' : 'create'} coupon: ${errorMessage}`)
+    } finally {
+      setCouponSubmitting(false)
+    }
+  }
+
+  // Delete customer
+  const deleteCustomer = async (customerId) => {
+    if (!window.confirm('Are you sure you want to delete this customer? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      await apiCall(`/api/admin/customers/${customerId}`, {
+        method: 'DELETE'
+      })
+      
+      // Remove customer from local state
+      setCustomers(prevCustomers => prevCustomers.filter(customer => customer.id !== customerId))
+      
+      // Show success message (you can add a toast notification here)
+      console.log('Customer deleted successfully')
+      
+      // Optionally refresh the customers list
+      fetchCustomers()
+    } catch (error) {
+      console.error('Error deleting customer:', error)
+      alert(`Failed to delete customer: ${error.message}`)
     }
   }
 
@@ -458,16 +1360,16 @@ function App() {
               Transaction
             </a>
             <a 
-              href="#brand" 
-              className={`menu-item ${activeMenu === 'brand' ? 'active' : ''}`}
-              onClick={(e) => { e.preventDefault(); setActiveMenu('brand'); }}
+              href="#messages" 
+              className={`menu-item ${activeMenu === 'messages' ? 'active' : ''}`}
+              onClick={(e) => { e.preventDefault(); setActiveMenu('messages'); }}
             >
               <div className="menu-item-icon">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9.049 2.927C9.349 2.005 10.651 2.005 10.951 2.927L12.47 7.6C12.6111 8.018 13.0022 8.30063 13.442 8.30063H18.31C19.275 8.30063 19.676 9.53143 18.887 10.1L14.946 12.938C14.5836 13.203 14.4225 13.6667 14.563 14.0846L16.082 18.7576C16.382 19.68 15.33 20.4386 14.541 19.8686L10.6 17.0306C10.2376 16.7656 9.76238 16.7656 9.4 17.0306L5.459 19.8686C4.67 20.4386 3.618 19.68 3.918 18.7576L5.437 14.0846C5.57755 13.6667 5.41638 13.203 5.054 12.938L1.113 10.1C0.323998 9.53143 0.724998 8.30063 1.69 8.30063H6.558C6.99777 8.30063 7.38889 8.018 7.53 7.6L9.049 2.927Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M18 5V13C18 14.1046 17.1046 15 16 15H6L2 19V5C2 3.89543 2.89543 3 4 3H16C17.1046 3 18 3.89543 18 5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
-              Brand
+              Messages
             </a>
           </div>
 
@@ -830,9 +1732,9 @@ function App() {
                   <>
                     <div className="product-list">
                       {products.map((product) => {
-                        const price = new Intl.NumberFormat('en-US', {
+                        const price = new Intl.NumberFormat('en-NG', {
                           style: 'currency',
-                          currency: 'USD',
+                          currency: 'NGN',
                           minimumFractionDigits: 2
                         }).format(parseFloat(product.price || 0))
                         
@@ -913,9 +1815,9 @@ function App() {
                   <tbody>
                     {bestSellingProducts.length > 0 ? (
                       bestSellingProducts.map((product) => {
-                        const price = new Intl.NumberFormat('en-US', {
+                        const price = new Intl.NumberFormat('en-NG', {
                           style: 'currency',
-                          currency: 'USD',
+                          currency: 'NGN',
                           minimumFractionDigits: 2
                         }).format(product.price)
                         
@@ -1189,30 +2091,31 @@ function App() {
                     <input type="checkbox" />
                   </th>
                   <th>No.</th>
-                  <th>Order Id</th>
+                  <th>Tracking Number</th>
                   <th>Product</th>
                   <th>Date</th>
                   <th>Price</th>
                   <th>Payment</th>
                   <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {ordersLoading ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                    <td colSpan="9" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
                       Loading orders...
                     </td>
                   </tr>
                 ) : ordersError ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#991b1b' }}>
+                    <td colSpan="9" style={{ textAlign: 'center', padding: '2rem', color: '#991b1b' }}>
                       Error: {ordersError}
                     </td>
                   </tr>
                 ) : orders.length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                    <td colSpan="9" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
                       No orders found
                     </td>
                   </tr>
@@ -1226,14 +2129,14 @@ function App() {
                     })
                     
                     // Format amount
-                    const amount = new Intl.NumberFormat('en-US', {
+                    const amount = new Intl.NumberFormat('en-NG', {
                       style: 'currency',
-                      currency: 'USD',
+                      currency: 'NGN',
                       minimumFractionDigits: 2
                     }).format(parseFloat(order.total_amount || 0))
 
-                    // Get order number or ID
-                    const orderNumber = order.order_number || `#${order.id.substring(0, 8).toUpperCase()}`
+                    // Get tracking number
+                    const trackingNumber = order.tracking_number || order.trackingNumber || order.tracking_code || order.trackingCode || 'N/A'
 
                     // Get first product name from items if available
                     let productName = 'Multiple Products'
@@ -1278,7 +2181,7 @@ function App() {
                       <tr key={order.id}>
                         <td><input type="checkbox" /></td>
                         <td>{(currentPage - 1) * 10 + index + 1}</td>
-                        <td>{orderNumber}</td>
+                        <td>{trackingNumber}</td>
                         <td>
                           <div className="order-product-cell">
                             <img src={productImage} alt={productName} />
@@ -1332,12 +2235,11 @@ function App() {
                                 onChange={(e) => {
                                   const newStatus = e.target.value
                                   if (newStatus !== currentStatus) {
-                                    if (window.confirm(`Change order status from "${status.label}" to "${statusConfig[newStatus]?.label}"?`)) {
-                                      updateOrderStatus(order.id, newStatus)
-                                    } else {
-                                      // Reset to current status if cancelled
+                                    handleOrderStatusChange(order.id, currentStatus, newStatus)
+                                    // Reset select value if user cancels
+                                    setTimeout(() => {
                                       e.target.value = currentStatus
-                                    }
+                                    }, 0)
                                   }
                                 }}
                                 onClick={(e) => e.stopPropagation()}
@@ -1356,8 +2258,29 @@ function App() {
                                   }
                                   return null
                                 })}
+                                {/* Add cancel option */}
+                                <option value="canceled">Cancel Order</option>
                               </select>
                             )}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="order-actions">
+                            <button
+                              className="order-action-btn delete-btn"
+                              onClick={() => {
+                                const trackingNum = order.tracking_number || order.trackingNumber || order.tracking_code || order.trackingCode || 'N/A'
+                                const orderUuid = order.uuid || order.id
+                                if (window.confirm(`Are you sure you want to delete order with tracking number "${trackingNum}"? This action cannot be undone.`)) {
+                                  deleteOrder(orderUuid)
+                                }
+                              }}
+                              title="Delete Order"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M2 4H14M5 4V3C5 2.44772 5.44772 2 6 2H10C10.5523 2 11 2.44772 11 3V4M13 4V13C13 13.5523 12.5523 14 12 14H4C3.44772 14 3 13.5523 3 13V4M6 7V11M10 7V11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1367,6 +2290,90 @@ function App() {
               </tbody>
             </table>
             </div>
+
+          {/* Order Status Update Modal */}
+          {isOrderStatusModalOpen && (
+            <div className="modal-overlay" onClick={() => setIsOrderStatusModalOpen(false)}>
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h2 className="modal-title">
+                    {orderStatusUpdate.newStatus === 'shipped' ? 'Mark as Shipped' : 'Cancel Order'}
+                  </h2>
+                  <button 
+                    className="modal-close-btn"
+                    onClick={() => setIsOrderStatusModalOpen(false)}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                  </button>
+                </div>
+                <div className="modal-body">
+                  {orderStatusUpdate.newStatus === 'shipped' ? (
+                    <div className="form-group">
+                      <label className="form-label">
+                        Tracking Number <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Enter tracking number (e.g., TRK-2024-123456)"
+                        value={orderStatusUpdate.trackingNumber}
+                        onChange={(e) => setOrderStatusUpdate(prev => ({ ...prev, trackingNumber: e.target.value }))}
+                        autoFocus
+                      />
+                      <p className="form-help-text">
+                        This tracking number will be sent to the customer.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="form-group">
+                      <label className="form-label">
+                        Cancellation Notes (Optional)
+                      </label>
+                      <textarea
+                        className="form-textarea"
+                        placeholder="Enter reason for cancellation (e.g., Customer requested cancellation)"
+                        value={orderStatusUpdate.notes}
+                        onChange={(e) => setOrderStatusUpdate(prev => ({ ...prev, notes: e.target.value }))}
+                        rows="4"
+                        autoFocus
+                      />
+                      <p className="form-help-text">
+                        Optional notes about why this order is being canceled.
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  <button
+                    className="modal-btn cancel-btn"
+                    onClick={() => setIsOrderStatusModalOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="modal-btn submit-btn"
+                    onClick={() => {
+                      if (orderStatusUpdate.newStatus === 'shipped' && !orderStatusUpdate.trackingNumber.trim()) {
+                        alert('Please enter a tracking number')
+                        return
+                      }
+                      updateOrderStatus(
+                        orderStatusUpdate.orderId,
+                        orderStatusUpdate.newStatus,
+                        orderStatusUpdate.trackingNumber || null,
+                        orderStatusUpdate.notes || null
+                      )
+                    }}
+                    disabled={orderStatusUpdate.newStatus === 'shipped' && !orderStatusUpdate.trackingNumber.trim()}
+                  >
+                    {orderStatusUpdate.newStatus === 'shipped' ? 'Mark as Shipped' : 'Cancel Order'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Pagination */}
           <div className="order-pagination">
@@ -1423,15 +2430,21 @@ function App() {
                   </svg>
                 </button>
             </div>
-              <div className="customer-summary-value">11,040</div>
+              <div className="customer-summary-value">
+                {customerMetricsLoading ? 'Loading...' : 
+                 customerMetricsError ? 'Error' : 
+                 customerMetrics?.totalCustomers?.formatted || customerMetrics?.totalCustomers?.value || '0'}
+              </div>
               <div className="customer-summary-footer">
-                <span className="customer-summary-period">Last 7 days</span>
-                <span className="customer-summary-trend up">
+                <span className="customer-summary-period">{customerMetrics?.period?.current || 'Last 7 days'}</span>
+                {customerMetrics?.totalCustomers?.changeType && (
+                  <span className={`customer-summary-trend ${customerMetrics.totalCustomers.changeType === 'increase' ? 'up' : 'down'}`}>
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M6 2V10M6 2L3 5M6 2L9 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  14.4%
+                    {Math.abs(customerMetrics.totalCustomers.change || 0).toFixed(1)}%
                 </span>
+                )}
                   </div>
             </div>
 
@@ -1446,15 +2459,21 @@ function App() {
                     </svg>
                 </button>
                   </div>
-              <div className="customer-summary-value">2,370</div>
+              <div className="customer-summary-value">
+                {customerMetricsLoading ? 'Loading...' : 
+                 customerMetricsError ? 'Error' :
+                 customerMetrics?.newCustomers?.formatted || customerMetrics?.newCustomers?.value || '0'}
+              </div>
               <div className="customer-summary-footer">
-                <span className="customer-summary-period">Last 7 days</span>
-                <span className="customer-summary-trend up">
+                <span className="customer-summary-period">{customerMetrics?.period?.current || 'Last 7 days'}</span>
+                {customerMetrics?.newCustomers?.changeType && (
+                  <span className={`customer-summary-trend ${customerMetrics.newCustomers.changeType === 'increase' ? 'up' : 'down'}`}>
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M6 2V10M6 2L3 5M6 2L9 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  20%
+                    {Math.abs(customerMetrics.newCustomers.change || 0).toFixed(1)}%
                 </span>
+                )}
                 </div>
                   </div>
 
@@ -1469,15 +2488,21 @@ function App() {
                     </svg>
                 </button>
                   </div>
-              <div className="customer-summary-value">250k</div>
+              <div className="customer-summary-value">
+                {customerMetricsLoading ? 'Loading...' : 
+                 customerMetricsError ? 'Error' :
+                 customerMetrics?.visitors?.formatted || customerMetrics?.visitors?.value || '0'}
+              </div>
               <div className="customer-summary-footer">
-                <span className="customer-summary-period">Last 7 days</span>
-                <span className="customer-summary-trend up">
+                <span className="customer-summary-period">{customerMetrics?.period?.current || 'Last 7 days'}</span>
+                {customerMetrics?.visitors?.changeType && (
+                  <span className={`customer-summary-trend ${customerMetrics.visitors.changeType === 'increase' ? 'up' : 'down'}`}>
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M6 2V10M6 2L3 5M6 2L9 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  20%
+                    {Math.abs(customerMetrics.visitors.change || 0).toFixed(1)}%
                 </span>
+                )}
                 </div>
                   </div>
           </div>
@@ -1501,35 +2526,76 @@ function App() {
                 </button>
               </div>
             </div>
+            {customerOverviewLoading ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                Loading overview data...
+              </div>
+            ) : customerOverviewError ? (
+              <div style={{ padding: '1rem', color: '#991b1b', background: '#fef2f2', borderRadius: '8px', margin: '1rem' }}>
+                Error: {customerOverviewError}
+              </div>
+            ) : (
+              <>
             <div className="customer-metrics">
               <div className="customer-metric">
                 <div className="customer-metric-label">Active Customers</div>
-                <div className="customer-metric-value active">25k</div>
+                    <div className="customer-metric-value active">
+                      {customerOverview?.summary?.activeCustomersFormatted || customerOverview?.summary?.activeCustomers || '0'}
+                    </div>
               </div>
               <div className="customer-metric">
                 <div className="customer-metric-label">Repeat Customers</div>
-                <div className="customer-metric-value">5.6k</div>
+                    <div className="customer-metric-value">
+                      {customerOverview?.summary?.repeatCustomersFormatted || customerOverview?.summary?.repeatCustomers || '0'}
+                    </div>
               </div>
               <div className="customer-metric">
                 <div className="customer-metric-label">Shop Visitor</div>
-                <div className="customer-metric-value">250k</div>
+                    <div className="customer-metric-value">
+                      {customerOverview?.summary?.shopVisitorFormatted || customerOverview?.summary?.shopVisitor || '0'}
+                    </div>
               </div>
               <div className="customer-metric">
                 <div className="customer-metric-label">Conversion Rate</div>
-                <div className="customer-metric-value">5.5%</div>
+                    <div className="customer-metric-value">
+                      {customerOverview?.summary?.conversionRate ? `${customerOverview.summary.conversionRate}%` : '0%'}
+                    </div>
               </div>
             </div>
             <div className="customer-chart-placeholder">
               <div className="chart-axis">
                 <div className="chart-y-axis">
-                  <span>50k</span>
-                  <span>40k</span>
-                  <span>30k</span>
-                  <span>20k</span>
-                  <span>10k</span>
-                  <span>0k</span>
+                      {(() => {
+                        const trends = customerOverview?.trends || []
+                        const maxValue = trends.length > 0 ? Math.max(...trends.map(t => t.count || 0), 1) : 1
+                        const steps = 5
+                        return Array.from({ length: steps + 1 }, (_, i) => {
+                          const value = maxValue * (1 - i / steps)
+                          return value >= 1000 ? `${(value / 1000).toFixed(0)}k` : Math.ceil(value).toString()
+                        }).map((label, i) => <span key={i}>{label}</span>)
+                      })()}
                 </div>
                 <div className="chart-area">
+                      {(() => {
+                        const trends = customerOverview?.trends || []
+                        const hasData = trends.length > 0
+                        const dataPoints = hasData ? trends.map(t => t.count || 0) : [0, 0, 0, 0, 0, 0, 0]
+                        const maxValue = hasData ? Math.max(...dataPoints, 1) : 1
+                        const minValue = 0
+                        const range = maxValue - minValue || 1
+                        const width = 600
+                        const height = 200
+                        const padding = 50
+                        const chartWidth = width - padding * 2
+                        const chartHeight = height - padding * 2
+                        const points = dataPoints.map((value, index) => {
+                          const x = padding + (index / (dataPoints.length - 1 || 1)) * chartWidth
+                          const y = padding + chartHeight - ((value - minValue) / range) * chartHeight
+                          return `${x},${y}`
+                        }).join(' ')
+                        const pathD = `M ${points.split(' ').map((p, i) => i === 0 ? p : `L ${p}`).join(' ')}`
+                        const fillPathD = `${pathD} L ${padding + chartWidth},${padding + chartHeight} L ${padding},${padding + chartHeight} Z`
+                        return (
                   <svg width="100%" height="200" viewBox="0 0 600 200" preserveAspectRatio="none">
                     <defs>
                       <linearGradient id="customerGradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -1537,28 +2603,108 @@ function App() {
                         <stop offset="100%" stopColor="#4CAF50" stopOpacity="0.05"/>
                       </linearGradient>
                     </defs>
-                    <path d="M 50 150 L 100 120 L 150 100 L 200 80 L 250 60 L 300 70 L 350 50 L 550 50" 
+                            <path d={pathD} 
                           stroke="#4CAF50" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M 50 150 L 100 120 L 150 100 L 200 80 L 250 60 L 300 70 L 350 50 L 550 50 L 550 200 L 50 200 Z" 
+                            <path d={fillPathD} 
                           fill="url(#customerGradient)"/>
-                    <circle cx="250" cy="60" r="6" fill="#4CAF50" stroke="#ffffff" strokeWidth="2"/>
+                            {dataPoints.map((value, index) => {
+                              const x = padding + (index / (dataPoints.length - 1 || 1)) * chartWidth
+                              const y = padding + chartHeight - ((value - minValue) / range) * chartHeight
+                              return (
+                                <circle key={index} cx={x} cy={y} r="6" fill="#4CAF50" stroke="#ffffff" strokeWidth="2"/>
+                              )
+                            })}
                   </svg>
+                        )
+                      })()}
                   <div className="chart-x-axis">
-                    <span>Sun</span>
-                    <span>Mon</span>
-                    <span>Tue</span>
-                    <span>Wed</span>
-                    <span>Thu</span>
-                    <span>Fri</span>
-                    <span>Sat</span>
+                        {customerOverview?.trends?.map((trend, i) => (
+                          <span key={i}>{trend.day}</span>
+                        )) || ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, i) => <span key={i}>{day}</span>)}
                   </div>
                 </div>
               </div>
             </div>
+              </>
+            )}
           </div>
 
           {/* Customer List Table */}
           <div className="customer-table-card">
+            {/* Search and Filter Controls */}
+            <div className="order-search-controls" style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="order-search-bar" style={{ flex: '1', minWidth: '200px' }}>
+                <svg className="order-search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M7.33333 12.6667C10.2789 12.6667 12.6667 10.2789 12.6667 7.33333C12.6667 4.38781 10.2789 2 7.33333 2C4.38781 2 2 4.38781 2 7.33333C2 10.2789 4.38781 12.6667 7.33333 12.6667Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M14 14L11.1 11.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <input 
+                  type="text" 
+                  placeholder="Search customers..." 
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                />
+              </div>
+              <select 
+                value={customerStatusFilter}
+                onChange={(e) => {
+                  setCustomerStatusFilter(e.target.value)
+                  setCustomerPage(1)
+                }}
+                style={{ 
+                  padding: '0.5rem 1rem', 
+                  borderRadius: '8px', 
+                  border: '1px solid #e5e7eb',
+                  background: 'white',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="vip">VIP</option>
+              </select>
+              <select 
+                value={customerSortBy}
+                onChange={(e) => {
+                  setCustomerSortBy(e.target.value)
+                  setCustomerPage(1)
+                }}
+                style={{ 
+                  padding: '0.5rem 1rem', 
+                  borderRadius: '8px', 
+                  border: '1px solid #e5e7eb',
+                  background: 'white',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="order_count">Order Count</option>
+                <option value="total_spend">Total Spend</option>
+                <option value="name">Name</option>
+                <option value="created_at">Date Joined</option>
+              </select>
+              <button
+                onClick={() => {
+                  setCustomerSortOrder(customerSortOrder === 'asc' ? 'desc' : 'asc')
+                  setCustomerPage(1)
+                }}
+                style={{ 
+                  padding: '0.5rem 1rem', 
+                  borderRadius: '8px', 
+                  border: '1px solid #e5e7eb',
+                  background: 'white',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem'
+                }}
+              >
+                {customerSortOrder === 'asc' ? '↑' : '↓'} {customerSortOrder === 'asc' ? 'Asc' : 'Desc'}
+              </button>
+            </div>
             <table className="customer-table">
               <thead>
                 <tr>
@@ -1572,27 +2718,69 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>#CUST001</td>
-                  <td>John Doe</td>
-                  <td>+1234567890</td>
-                  <td>25</td>
-                  <td>$3,450.00</td>
-                  <td>
-                    <span className="customer-status active">
+                {customersLoading ? (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                      Loading customers...
+                    </td>
+                  </tr>
+                ) : customersError ? (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#991b1b' }}>
+                      Error: {customersError}
+                    </td>
+                  </tr>
+                ) : customers.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                      No customers found
+                    </td>
+                  </tr>
+                ) : (
+                  customers.map((customer, index) => {
+                    // Use the exact structure from API response
+                    const customerId = customer.customerId || customer.id || `CUST${index + 1}`
+                    const customerName = customer.name && customer.name !== 'N/A' ? customer.name : (customer.email ? customer.email.split('@')[0] : 'Unknown')
+                    const phone = customer.phone && customer.phone !== 'N/A' ? customer.phone : 'N/A'
+                    const orderCount = customer.orderCount || 0
+                    const totalSpend = customer.totalSpend || 0
+                    const status = customer.status || 'Active'
+                    const statusClass = status.toLowerCase() === 'vip' ? 'vip' : status.toLowerCase() === 'inactive' ? 'inactive' : 'active'
+                    const statusLabel = status
+                    
+                    return (
+                      <tr key={customer.id || customerId || index}>
+                        <td>{customerId}</td>
+                        <td>{customerName}</td>
+                        <td>{phone}</td>
+                        <td>{orderCount}</td>
+                        <td>{customer.totalSpendFormatted || new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 2 }).format(totalSpend)}</td>
+                        <td>
+                          <span className={`customer-status ${statusClass}`}>
                       <span className="customer-status-dot"></span>
-                      Active
+                            {statusLabel}
                     </span>
                   </td>
                   <td>
                     <div className="customer-actions">
-                      <button className="customer-action-btn">
+                            <button 
+                              className="customer-action-btn"
+                              onClick={() => {
+                                setSelectedCustomer(customer)
+                                setIsCustomerModalOpen(true)
+                              }}
+                              title="View customer details"
+                            >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                           <path d="M8 5V8M8 11H8.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                     </svg>
                       </button>
-                      <button className="customer-action-btn">
+                            <button 
+                              className="customer-action-btn" 
+                              title="Delete customer"
+                              onClick={() => deleteCustomer(customer.id)}
+                            >
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
@@ -1600,118 +2788,9 @@ function App() {
                   </div>
                   </td>
                 </tr>
-                <tr>
-                  <td>#CUST001</td>
-                  <td>Jane Smith</td>
-                  <td>+1234567890</td>
-                  <td>5</td>
-                  <td>$250.00</td>
-                  <td>
-                    <span className="customer-status inactive">
-                      <span className="customer-status-dot"></span>
-                      Inactive
-                    </span>
-                  </td>
-                  <td>
-                    <div className="customer-actions">
-                      <button className="customer-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M8 5V8M8 11H8.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
-                      </button>
-                      <button className="customer-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>#CUST001</td>
-                  <td>Emily Davis</td>
-                  <td>+1234567890</td>
-                  <td>30</td>
-                  <td>$4,600.00</td>
-                  <td>
-                    <span className="customer-status vip">
-                      <span className="customer-status-dot"></span>
-                      VIP
-                    </span>
-                  </td>
-                  <td>
-                    <div className="customer-actions">
-                      <button className="customer-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M8 5V8M8 11H8.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
-                      </button>
-                      <button className="customer-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-              </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>#CUST001</td>
-                  <td>Michael Brown</td>
-                  <td>+1234567890</td>
-                  <td>15</td>
-                  <td>$1,800.00</td>
-                  <td>
-                    <span className="customer-status active">
-                      <span className="customer-status-dot"></span>
-                      Active
-                    </span>
-                  </td>
-                  <td>
-                    <div className="customer-actions">
-                      <button className="customer-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M8 5V8M8 11H8.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
-                      </button>
-                      <button className="customer-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-              </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>#CUST001</td>
-                  <td>Sarah Wilson</td>
-                  <td>+1234567890</td>
-                  <td>8</td>
-                  <td>$950.00</td>
-                  <td>
-                    <span className="customer-status vip">
-                      <span className="customer-status-dot"></span>
-                      VIP
-                    </span>
-                  </td>
-                  <td>
-                    <div className="customer-actions">
-                      <button className="customer-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M8 5V8M8 11H8.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
-                      </button>
-                      <button className="customer-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-            </div>
-                  </td>
-                </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -1721,35 +2800,1156 @@ function App() {
             <button 
               className="pagination-btn"
               onClick={() => setCustomerPage(Math.max(1, customerPage - 1))}
-              disabled={customerPage === 1}
+              disabled={customerPage === 1 || customersLoading}
             >
               ← Previous
             </button>
             <div className="pagination-numbers">
-              {[1, 2, 3, 4, 5].map((num) => (
-                <button
-                  key={num}
-                  className={`pagination-number ${customerPage === num ? 'active' : ''}`}
-                  onClick={() => setCustomerPage(num)}
-                >
-                  {num}
-                </button>
-              ))}
-              <span className="pagination-ellipsis">...</span>
-              <button
-                className={`pagination-number ${customerPage === 24 ? 'active' : ''}`}
-                onClick={() => setCustomerPage(24)}
-              >
-                24
-              </button>
+              {(() => {
+                const totalPages = customerTotalPages || 1
+                const currentPage = customerPage
+                const pages = []
+                
+                if (totalPages <= 7) {
+                  // Show all pages if 7 or fewer
+                  for (let i = 1; i <= totalPages; i++) {
+                    pages.push(i)
+                  }
+                } else {
+                  // Show first page
+                  pages.push(1)
+                  
+                  if (currentPage > 3) {
+                    pages.push('ellipsis-start')
+                  }
+                  
+                  // Show pages around current page
+                  const start = Math.max(2, currentPage - 1)
+                  const end = Math.min(totalPages - 1, currentPage + 1)
+                  
+                  for (let i = start; i <= end; i++) {
+                    pages.push(i)
+                  }
+                  
+                  if (currentPage < totalPages - 2) {
+                    pages.push('ellipsis-end')
+                  }
+                  
+                  // Show last page
+                  pages.push(totalPages)
+                }
+                
+                return pages.map((page, index) => {
+                  if (page === 'ellipsis-start' || page === 'ellipsis-end') {
+                    return <span key={`ellipsis-${index}`} className="pagination-ellipsis">...</span>
+                  }
+                  return (
+                    <button
+                      key={page}
+                      className={`pagination-number ${customerPage === page ? 'active' : ''}`}
+                      onClick={() => setCustomerPage(page)}
+                    >
+                      {page}
+                    </button>
+                  )
+                })
+              })()}
         </div>
             <button 
               className="pagination-btn"
-              onClick={() => setCustomerPage(Math.min(24, customerPage + 1))}
-              disabled={customerPage === 24}
+              onClick={() => setCustomerPage(Math.min(customerTotalPages || 1, customerPage + 1))}
+              disabled={customerPage >= (customerTotalPages || 1) || customersLoading}
             >
               Next →
             </button>
+          </div>
+        </div>
+        )}
+
+        {/* Customer Details Modal */}
+        {isCustomerModalOpen && selectedCustomer && (
+          <div 
+            className="modal-overlay"
+            onClick={() => setIsCustomerModalOpen(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '1rem'
+            }}
+          >
+            <div 
+              className="customer-modal"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: 'white',
+                borderRadius: '12px',
+                padding: '2rem',
+                maxWidth: '600px',
+                width: '100%',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '600', color: '#111827' }}>Customer Details</h2>
+                <button
+                  onClick={() => setIsCustomerModalOpen(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '8px',
+                    color: '#6b7280',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6'
+                    e.target.style.color = '#111827'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent'
+                    e.target.style.color = '#6b7280'
+                  }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* Customer ID */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.5rem' }}>Customer ID</label>
+                  <div style={{ fontSize: '1rem', color: '#111827', fontWeight: '500' }}>{selectedCustomer.customerId || selectedCustomer.id}</div>
+                </div>
+
+                {/* Name */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.5rem' }}>Name</label>
+                  <div style={{ fontSize: '1rem', color: '#111827' }}>
+                    {selectedCustomer.name && selectedCustomer.name !== 'N/A' ? selectedCustomer.name : 'Not provided'}
+                  </div>
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.5rem' }}>Email</label>
+                  <div style={{ fontSize: '1rem', color: '#111827' }}>{selectedCustomer.email || 'Not provided'}</div>
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.5rem' }}>Phone</label>
+                  <div style={{ fontSize: '1rem', color: '#111827' }}>
+                    {selectedCustomer.phone && selectedCustomer.phone !== 'N/A' ? selectedCustomer.phone : 'Not provided'}
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.5rem' }}>Status</label>
+                  <div>
+                    <span className={`customer-status ${(selectedCustomer.status || 'active').toLowerCase() === 'vip' ? 'vip' : (selectedCustomer.status || 'active').toLowerCase() === 'inactive' ? 'inactive' : 'active'}`}>
+                      <span className="customer-status-dot"></span>
+                      {selectedCustomer.status || 'Active'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Order Count */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.5rem' }}>Total Orders</label>
+                  <div style={{ fontSize: '1rem', color: '#111827', fontWeight: '500' }}>{selectedCustomer.orderCount || 0}</div>
+                </div>
+
+                {/* Total Spend */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.5rem' }}>Total Spend</label>
+                  <div style={{ fontSize: '1.25rem', color: '#111827', fontWeight: '600' }}>
+                    {selectedCustomer.totalSpendFormatted || new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 2 }).format(selectedCustomer.totalSpend || 0)}
+                  </div>
+                </div>
+
+                {/* Date Joined */}
+                {selectedCustomer.createdAt && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.5rem' }}>Date Joined</label>
+                    <div style={{ fontSize: '1rem', color: '#111827' }}>
+                      {new Date(selectedCustomer.createdAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <button
+                  onClick={() => setIsCustomerModalOpen(false)}
+                  style={{
+                    padding: '0.625rem 1.25rem',
+                    borderRadius: '8px',
+                    border: '1px solid #e5e7eb',
+                    backgroundColor: 'white',
+                    color: '#374151',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f9fafb'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'white'
+                  }}
+                >
+                  Close
+                      </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeMenu === 'coupon' && (
+        <div className="dashboard-content">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <h1 className="dashboard-title">Coupon Codes</h1>
+            <button
+              onClick={() => {
+                setSelectedCoupon(null)
+                setCouponFormData({
+                  code: '',
+                  description: '',
+                  discountType: 'percentage',
+                  discountValue: '',
+                  minPurchase: '',
+                  maxDiscount: '',
+                  usageLimit: '',
+                  userLimit: '',
+                  expiryDate: '',
+                  status: 'active'
+                })
+                setIsCouponModalOpen(true)
+              }}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#059669'
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#10b981'
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+              Create Coupon
+                      </button>
+                </div>
+
+          {/* Coupons Table */}
+          <div className="customer-table-card">
+            {couponsLoading ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                Loading coupons...
+              </div>
+            ) : couponsError ? (
+              <div style={{ padding: '1rem', color: '#991b1b', background: '#fef2f2', borderRadius: '8px', margin: '1rem' }}>
+                Error: {couponsError}
+              </div>
+            ) : coupons.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ margin: '0 auto 1rem', opacity: 0.5 }}>
+                  <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2"/>
+                  <path d="M9 12L11 14L15 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <p>No coupons found. Create your first coupon code!</p>
+              </div>
+            ) : (
+              <table className="customer-table">
+                <thead>
+                  <tr>
+                    <th>Coupon Code</th>
+                    <th>Discount</th>
+                    <th>Min Purchase</th>
+                    <th>Usage Limit</th>
+                    <th>Used</th>
+                    <th>Expiry Date</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {coupons.map((coupon) => (
+                    <tr key={coupon.id || coupon.code}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ 
+                            fontFamily: 'monospace', 
+                            fontSize: '0.875rem', 
+                            fontWeight: '600',
+                            backgroundColor: '#f3f4f6',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '6px',
+                            color: '#111827'
+                          }}>
+                            {coupon.code}
+                    </span>
+                        </div>
+                  </td>
+                  <td>
+                        {coupon.discountType === 'percentage' 
+                          ? `${coupon.discountValue || coupon.discount}%`
+                          : new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 2 }).format(coupon.discountValue || coupon.discount || 0)
+                        }
+                  </td>
+                      <td>
+                        {coupon.minPurchase || coupon.minOrderAmount
+                          ? new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 2 }).format(coupon.minPurchase || coupon.minOrderAmount)
+                          : 'No minimum'
+                        }
+                      </td>
+                      <td>{coupon.usageLimit || 'Unlimited'}</td>
+                      <td>{coupon.usedCount || coupon.used || 0}</td>
+                      <td>
+                        {coupon.expiryDate || coupon.validUntil
+                          ? new Date(coupon.expiryDate || coupon.validUntil).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                          : 'No expiry'
+                        }
+                      </td>
+                      <td>
+                        <span className={`customer-status ${(coupon.isActive !== false && coupon.status !== 'inactive') ? 'active' : 'inactive'}`}>
+                      <span className="customer-status-dot"></span>
+                          {coupon.isActive === false || coupon.status === 'inactive' ? 'Inactive' : 'Active'}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="customer-actions">
+                          <button 
+                            className="customer-action-btn"
+                            onClick={() => {
+                              setSelectedCoupon(coupon)
+                              setCouponFormData({
+                                code: coupon.code || '',
+                                description: coupon.description || '',
+                                discountType: coupon.discountType || 'percentage',
+                                discountValue: coupon.discountValue || coupon.discount || '',
+                                minPurchase: coupon.minPurchase || coupon.minOrderAmount || '',
+                                maxDiscount: coupon.maxDiscount || coupon.maxDiscountAmount || '',
+                                usageLimit: coupon.usageLimit || '',
+                                userLimit: coupon.userLimit || '1',
+                                expiryDate: coupon.expiryDate || coupon.validUntil ? (coupon.expiryDate || coupon.validUntil).split('T')[0] : '',
+                                status: coupon.isActive === false ? 'inactive' : 'active'
+                              })
+                              setIsCouponModalOpen(true)
+                            }}
+                            title="Edit coupon"
+                          >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M11.3333 2.00001C11.5084 1.82491 11.7163 1.68602 11.9444 1.59129C12.1726 1.49657 12.4163 1.44775 12.6625 1.44775C12.9087 1.44775 13.1524 1.49657 13.3806 1.59129C13.6087 1.68602 13.8166 1.82491 13.9917 2.00001C14.1668 2.17511 14.3057 2.38301 14.4004 2.61112C14.4951 2.83923 14.5439 3.08295 14.5439 3.32918C14.5439 3.5754 14.4951 3.81912 14.4004 4.04723C14.3057 4.27534 14.1668 4.48324 13.9917 4.65834L5.32498 13.325L1.33331 14.6667L2.67498 10.675L11.3333 2.00001Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                          <button 
+                            className="customer-action-btn"
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to delete coupon "${coupon.code}"?`)) {
+                                // Handle delete - you can add API call here
+                                console.log('Delete coupon:', coupon.id)
+                              }
+                            }}
+                            title="Delete coupon"
+                          >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+              </div>
+                  </td>
+                </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+        )}
+
+        {/* Coupon Create/Edit Modal */}
+        {isCouponModalOpen && (
+          <div 
+            className="modal-overlay"
+            onClick={() => setIsCouponModalOpen(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '1rem'
+            }}
+          >
+            <div 
+              className="coupon-modal"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: 'white',
+                borderRadius: '12px',
+                padding: '2rem',
+                maxWidth: '600px',
+                width: '100%',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '600', color: '#111827' }}>
+                  {selectedCoupon ? 'Edit Coupon' : 'Create New Coupon'}
+                </h2>
+                <button
+                  onClick={() => setIsCouponModalOpen(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '8px',
+                    color: '#6b7280',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6'
+                    e.target.style.color = '#111827'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent'
+                    e.target.style.color = '#6b7280'
+                  }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+
+              <form onSubmit={async (e) => {
+                e.preventDefault()
+                await handleCouponSubmit()
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* Coupon Code */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      Coupon Code <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={couponFormData.code}
+                      onChange={(e) => setCouponFormData({ ...couponFormData, code: e.target.value.toUpperCase() })}
+                      placeholder="SUMMER2024"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        fontFamily: 'monospace',
+                        fontWeight: '600'
+                      }}
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      Description
+                    </label>
+                    <textarea
+                      value={couponFormData.description}
+                      onChange={(e) => setCouponFormData({ ...couponFormData, description: e.target.value })}
+                      placeholder="e.g., 20% off on orders above ₦5000"
+                      rows="3"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        resize: 'vertical',
+                        fontFamily: 'inherit'
+                      }}
+                    />
+                  </div>
+
+                  {/* Discount Type */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      Discount Type <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <select
+                      value={couponFormData.discountType}
+                      onChange={(e) => setCouponFormData({ ...couponFormData, discountType: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="percentage">Percentage (%)</option>
+                      <option value="fixed">Fixed Amount (NGN)</option>
+                    </select>
+                  </div>
+
+                  {/* Discount Value */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      Discount Value <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      max={couponFormData.discountType === 'percentage' ? 100 : undefined}
+                      value={couponFormData.discountValue}
+                      onChange={(e) => setCouponFormData({ ...couponFormData, discountValue: e.target.value })}
+                      placeholder={couponFormData.discountType === 'percentage' ? '10' : '1000'}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+
+                  {/* Min Purchase */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      Minimum Purchase (NGN)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={couponFormData.minPurchase}
+                      onChange={(e) => setCouponFormData({ ...couponFormData, minPurchase: e.target.value })}
+                      placeholder="0"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+
+                  {/* Max Discount (for percentage) */}
+                  {couponFormData.discountType === 'percentage' && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Maximum Discount (NGN)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={couponFormData.maxDiscount}
+                        onChange={(e) => setCouponFormData({ ...couponFormData, maxDiscount: e.target.value })}
+                        placeholder="No limit"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          fontSize: '1rem'
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Usage Limit */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      Usage Limit (Total)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={couponFormData.usageLimit}
+                      onChange={(e) => setCouponFormData({ ...couponFormData, usageLimit: e.target.value })}
+                      placeholder="Unlimited"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+
+                  {/* User Limit */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      User Limit (Per User)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={couponFormData.userLimit}
+                      onChange={(e) => setCouponFormData({ ...couponFormData, userLimit: e.target.value })}
+                      placeholder="1"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        fontSize: '1rem'
+                      }}
+                    />
+                    <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>Number of times a single user can use this coupon</p>
+                  </div>
+
+                  {/* Expiry Date */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      Expiry Date
+                    </label>
+                    <input
+                      type="date"
+                      value={couponFormData.expiryDate}
+                      onChange={(e) => setCouponFormData({ ...couponFormData, expiryDate: e.target.value })}
+                      min={new Date().toISOString().split('T')[0]}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      Status
+                    </label>
+                    <select
+                      value={couponFormData.status}
+                      onChange={(e) => setCouponFormData({ ...couponFormData, status: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsCouponModalOpen(false)}
+                    style={{
+                      padding: '0.625rem 1.25rem',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb',
+                      backgroundColor: 'white',
+                      color: '#374151',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f9fafb'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'white'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={couponSubmitting}
+                    style={{
+                      padding: '0.625rem 1.25rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: couponSubmitting ? '#9ca3af' : '#10b981',
+                      color: 'white',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      cursor: couponSubmitting ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.2s',
+                      opacity: couponSubmitting ? 0.7 : 1
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!couponSubmitting) {
+                        e.target.style.backgroundColor = '#059669'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!couponSubmitting) {
+                        e.target.style.backgroundColor = '#10b981'
+                      }
+                    }}
+                  >
+                    {couponSubmitting ? 'Saving...' : (selectedCoupon ? 'Update Coupon' : 'Create Coupon')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {activeMenu === 'transaction' && (
+        <div className="dashboard-content">
+          <h1 className="dashboard-title">Transactions</h1>
+
+          {/* Search and Filter Controls */}
+          <div className="order-search-controls" style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="order-search-bar" style={{ flex: '1', minWidth: '200px' }}>
+              <svg className="order-search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7.33333 12.6667C10.2789 12.6667 12.6667 10.2789 12.6667 7.33333C12.6667 4.38781 10.2789 2 7.33333 2C4.38781 2 2 4.38781 2 7.33333C2 10.2789 4.38781 12.6667 7.33333 12.6667Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M14 14L11.1 11.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <input 
+                type="text" 
+                placeholder="Search transactions..." 
+                value={transactionSearch}
+                onChange={(e) => setTransactionSearch(e.target.value)}
+              />
+            </div>
+            <select 
+              value={transactionStatusFilter}
+              onChange={(e) => {
+                setTransactionStatusFilter(e.target.value)
+                setTransactionPage(1)
+              }}
+              style={{ 
+                padding: '0.5rem 1rem', 
+                borderRadius: '8px', 
+                border: '1px solid #e5e7eb',
+                background: 'white',
+                fontSize: '0.875rem',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="all">All Status</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+              <option value="refunded">Refunded</option>
+            </select>
+          </div>
+
+          {/* Transactions Table */}
+          <div className="customer-table-card">
+            {transactionsLoading ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                Loading transactions...
+              </div>
+            ) : transactionsError ? (
+              <div style={{ padding: '1rem', color: '#991b1b', background: '#fef2f2', borderRadius: '8px', margin: '1rem' }}>
+                Error: {transactionsError}
+              </div>
+            ) : transactions.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ margin: '0 auto 1rem', opacity: 0.5 }}>
+                  <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2"/>
+                  <path d="M9 12L11 14L15 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <p>No transactions found</p>
+              </div>
+            ) : (
+              <table className="customer-table">
+                <thead>
+                  <tr>
+                    <th>No</th>
+                    <th>Transaction ID</th>
+                    <th>Customer ID</th>
+                    <th>Order Date</th>
+                    <th>Amount</th>
+                    <th>Payment Method</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((transaction, index) => {
+                    const transactionId = transaction.id || transaction.transactionId || transaction.transaction_id || `TXN${index + 1}`
+                    const customerId = transaction.customerId || transaction.customer_id || transaction.customerId || 'N/A'
+                    const orderDate = transaction.orderDate || transaction.order_date || transaction.createdAt || transaction.created_at
+                    const amount = transaction.amountFormatted || transaction.amount_formatted || transaction.amount
+                    const status = transaction.status || 'pending'
+                    const statusColor = transaction.statusColor || transaction.status_color || (status.toLowerCase() === 'paid' ? 'green' : status.toLowerCase() === 'pending' ? 'orange' : 'red')
+                    const paymentMethod = transaction.paymentMethod || transaction.payment_method || transaction.method || 'N/A'
+                    
+                    return (
+                      <tr key={transactionId}>
+                        <td>{(transactionPage - 1) * 20 + index + 1}</td>
+                        <td>
+                          <span style={{ 
+                            fontFamily: 'monospace', 
+                            fontSize: '0.875rem',
+                            color: '#111827'
+                          }}>
+                            {String(transactionId).substring(0, 12).toUpperCase()}
+                    </span>
+                  </td>
+                        <td>{customerId}</td>
+                        <td>
+                          {orderDate 
+                            ? new Date(orderDate).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            : 'N/A'
+                          }
+                        </td>
+                        <td style={{ fontWeight: '600' }}>
+                          {typeof amount === 'string' 
+                            ? amount 
+                            : new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 2 }).format(amount || 0)
+                          }
+                        </td>
+                        <td>{paymentMethod}</td>
+                        <td>
+                          <span className={`status-badge status-${statusColor === 'green' ? 'paid' : statusColor === 'orange' ? 'pending' : 'paid'}`}>
+                            <span className="status-dot"></span>
+                            {status}
+                          </span>
+                        </td>
+                        <td>
+                          <button 
+                            className="customer-action-btn"
+                            onClick={() => {
+                              // You can add a transaction details modal here
+                              console.log('View transaction details:', transaction)
+                            }}
+                            title="View transaction details"
+                          >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M8 5V8M8 11H8.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                      </button>
+                  </td>
+                </tr>
+                    )
+                  })}
+              </tbody>
+            </table>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {transactionTotalPages > 1 && (
+            <div className="order-pagination" style={{ marginTop: '2rem' }}>
+            <button 
+              className="pagination-btn"
+                onClick={() => setTransactionPage(Math.max(1, transactionPage - 1))}
+                disabled={transactionPage === 1 || transactionsLoading}
+            >
+              ← Previous
+            </button>
+            <div className="pagination-numbers">
+                {(() => {
+                  const totalPages = transactionTotalPages || 1
+                  const currentPage = transactionPage
+                  const pages = []
+                  
+                  if (totalPages <= 7) {
+                    for (let i = 1; i <= totalPages; i++) {
+                      pages.push(i)
+                    }
+                  } else {
+                    pages.push(1)
+                    
+                    if (currentPage > 3) {
+                      pages.push('ellipsis-start')
+                    }
+                    
+                    const start = Math.max(2, currentPage - 1)
+                    const end = Math.min(totalPages - 1, currentPage + 1)
+                    
+                    for (let i = start; i <= end; i++) {
+                      pages.push(i)
+                    }
+                    
+                    if (currentPage < totalPages - 2) {
+                      pages.push('ellipsis-end')
+                    }
+                    
+                    pages.push(totalPages)
+                  }
+                  
+                  return pages.map((page, index) => {
+                    if (page === 'ellipsis-start' || page === 'ellipsis-end') {
+                      return <span key={`ellipsis-${index}`} className="pagination-ellipsis">...</span>
+                    }
+                    return (
+                <button
+                        key={page}
+                        className={`pagination-number ${transactionPage === page ? 'active' : ''}`}
+                        onClick={() => setTransactionPage(page)}
+                      >
+                        {page}
+                </button>
+                    )
+                  })
+                })()}
+        </div>
+            <button 
+              className="pagination-btn"
+                onClick={() => setTransactionPage(Math.min(transactionTotalPages || 1, transactionPage + 1))}
+                disabled={transactionPage >= (transactionTotalPages || 1) || transactionsLoading}
+            >
+              Next →
+            </button>
+          </div>
+          )}
+        </div>
+        )}
+
+        {activeMenu === 'messages' && (
+        <div className="dashboard-content">
+          <h1 className="dashboard-title">Messages</h1>
+
+          <div className="messages-container">
+            {/* Users List Sidebar */}
+            <div className="messages-users-sidebar">
+              <div className="messages-search">
+                <svg className="messages-search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M7 13C10.3137 13 13 10.3137 13 7C13 3.68629 10.3137 1 7 1C3.68629 1 1 3.68629 1 7C1 10.3137 3.68629 13 7 13Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M15 15L11 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <input 
+                  type="text" 
+                  placeholder="Search users..." 
+                  value={messageSearch}
+                  onChange={(e) => setMessageSearch(e.target.value)}
+                />
+              </div>
+
+              {chatUsersLoading && (
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                  Loading users...
+                </div>
+              )}
+
+              {chatUsersError && (
+                <div style={{ 
+                  padding: '1rem', 
+                  margin: '1rem',
+                  background: '#fef2f2', 
+                  border: '1px solid #fecaca', 
+                  color: '#991b1b', 
+                  borderRadius: '8px'
+                }}>
+                  Error: {chatUsersError}
+                </div>
+              )}
+
+              {!chatUsersLoading && !chatUsersError && (
+                <div className="messages-users-list">
+                  {chatUsers
+                    .filter(user => {
+                      if (!messageSearch.trim()) return true
+                      const search = messageSearch.toLowerCase()
+                      const name = (user.name || user.full_name || user.email || '').toLowerCase()
+                      const email = (user.email || '').toLowerCase()
+                      return name.includes(search) || email.includes(search)
+                    })
+                    .map(user => (
+                      <div
+                        key={user.id}
+                        className={`messages-user-item ${selectedChatUser?.id === user.id ? 'active' : ''}`}
+                        onClick={() => setSelectedChatUser(user)}
+                      >
+                        <div className="messages-user-avatar">
+                          {(user.name || user.full_name || user.email || 'U').charAt(0).toUpperCase()}
+                        </div>
+                        <div className="messages-user-info">
+                          <div className="messages-user-name">
+                            {user.name || user.full_name || user.email || 'Unknown User'}
+                          </div>
+                          <div className="messages-user-email">
+                            {user.email || 'No email'}
+                          </div>
+                        </div>
+                        {messages[user.id] && messages[user.id].length > 0 && (
+                          <div className="messages-unread-badge">
+                            {messages[user.id].filter(m => m.sender !== 'admin').length}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {!chatUsersLoading && !chatUsersError && chatUsers.filter(user => {
+                if (!messageSearch.trim()) return true
+                const search = messageSearch.toLowerCase()
+                const name = (user.name || user.full_name || user.email || '').toLowerCase()
+                const email = (user.email || '').toLowerCase()
+                return name.includes(search) || email.includes(search)
+              }).length === 0 && (
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                  No users found
+                </div>
+              )}
+            </div>
+
+            {/* Chat Area */}
+            <div className="messages-chat-area">
+              {selectedChatUser ? (
+                <>
+                  <div className="messages-chat-header">
+                    <div className="messages-chat-user-info">
+                      <div className="messages-chat-avatar">
+                        {(selectedChatUser.name || selectedChatUser.full_name || selectedChatUser.email || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="messages-chat-name">
+                          {selectedChatUser.name || selectedChatUser.full_name || selectedChatUser.email || 'Unknown User'}
+                        </div>
+                        <div className="messages-chat-email">
+                          {selectedChatUser.email || 'No email'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="messages-chat-messages">
+                    {messages[selectedChatUser.id] && messages[selectedChatUser.id].length > 0 ? (
+                      <>
+                        {messages[selectedChatUser.id].map((msg, index) => {
+                          const isAdmin = msg.sender === 'admin'
+                          const date = new Date(msg.timestamp || msg.createdAt)
+                          const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                          
+                          return (
+                            <div
+                              key={msg.id || index}
+                              className={`messages-message ${isAdmin ? 'admin' : 'user'}`}
+                            >
+                              <div className="messages-message-content">
+                                <div className="messages-message-text">{msg.message}</div>
+                                <div className="messages-message-time">{timeStr}</div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        <div ref={messagesEndRef} />
+                      </>
+                    ) : (
+                      <div className="messages-empty-state">
+                        <svg width="48" height="48" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ opacity: 0.3, marginBottom: '1rem' }}>
+                          <path d="M18 5V13C18 14.1046 17.1046 15 16 15H6L2 19V5C2 3.89543 2.89543 3 4 3H16C17.1046 3 18 3.89543 18 5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <p style={{ color: '#6b7280', margin: 0 }}>No messages yet. Start a conversation!</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="messages-chat-input">
+                    <input
+                      type="text"
+                      placeholder="Type a message..."
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          sendMessage()
+                        }
+                      }}
+                      disabled={sendingMessage}
+                    />
+                    <button
+                      className="messages-send-btn"
+                      onClick={sendMessage}
+                      disabled={!newMessage.trim() || sendingMessage}
+                    >
+                      {sendingMessage ? (
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="spinner">
+                          <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="2" strokeDasharray="32" strokeDashoffset="24" fill="none">
+                            <animate attributeName="stroke-dasharray" values="0 32;16 16;0 32" dur="1s" repeatCount="indefinite"/>
+                            <animate attributeName="stroke-dashoffset" values="0;-16;-32" dur="1s" repeatCount="indefinite"/>
+                          </circle>
+                        </svg>
+                      ) : (
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="messages-empty-chat">
+                  <svg width="64" height="64" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ opacity: 0.2, marginBottom: '1rem' }}>
+                    <path d="M18 5V13C18 14.1046 17.1046 15 16 15H6L2 19V5C2 3.89543 2.89543 3 4 3H16C17.1046 3 18 3.89543 18 5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <h3 style={{ color: '#374151', marginBottom: '0.5rem' }}>Select a user to start chatting</h3>
+                  <p style={{ color: '#6b7280', margin: 0 }}>Choose a user from the list to send messages</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         )}
@@ -1763,7 +3963,7 @@ function App() {
             <div className="discover-header">
               <h2 className="discover-title">Discover</h2>
               <div className="discover-actions">
-                <button className="add-product-discover-btn">
+                <button className="add-product-discover-btn" onClick={() => setActiveMenu('add-products')}>
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="2"/>
                     <path d="M10 6V14M6 10H14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
@@ -1781,80 +3981,32 @@ function App() {
               </div>
             </div>
             <div className="categories-grid-container">
+              {discoverCategoriesLoading ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                  Loading categories...
+                </div>
+              ) : discoverCategories.length > 0 ? (
               <div className="categories-grid">
-                <div className="category-discover-card">
+                  {discoverCategories.map((category, index) => (
+                    <div key={category.id || category.name || index} className="category-discover-card">
                   <div className="category-discover-icon">
-                    <img src="https://images.unsplash.com/photo-1498049794561-7780e7231661?w=64&h=64&fit=crop" alt="Electronics" />
+                        <img 
+                          src={category.image || category.image_url || 'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=64&h=64&fit=crop'} 
+                          alt={category.name || 'Category'} 
+                        />
                   </div>
-                  <span className="category-discover-name">Electronics</span>
+                      <span className="category-discover-name">{category.name || 'Unnamed Category'}</span>
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
-                <div className="category-discover-card">
-                  <div className="category-discover-icon">
-                    <img src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=64&h=64&fit=crop" alt="Fashion" />
+                  ))}
                   </div>
-                  <span className="category-discover-name">Fashion</span>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+              ) : (
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                  No categories available
                 </div>
-                <div className="category-discover-card">
-                  <div className="category-discover-icon">
-                    <img src="https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=64&h=64&fit=crop" alt="Accessories" />
-                  </div>
-                  <span className="category-discover-name">Accessories</span>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <div className="category-discover-card">
-                  <div className="category-discover-icon">
-                    <img src="https://images.unsplash.com/photo-1556911220-bff31c812dba?w=64&h=64&fit=crop" alt="Home & Kitchen" />
-                  </div>
-                  <span className="category-discover-name">Home & Kitchen</span>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <div className="category-discover-card">
-                  <div className="category-discover-icon">
-                    <img src="https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=64&h=64&fit=crop" alt="Sports & Outdoors" />
-                  </div>
-                  <span className="category-discover-name">Sports & Outdoors</span>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <div className="category-discover-card">
-                  <div className="category-discover-icon">
-                    <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=64&h=64&fit=crop" alt="Toys & Games" />
-                  </div>
-                  <span className="category-discover-name">Toys & Games</span>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <div className="category-discover-card">
-                  <div className="category-discover-icon">
-                    <img src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=64&h=64&fit=crop" alt="Health & Fitness" />
-                  </div>
-                  <span className="category-discover-name">Health & Fitness</span>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <div className="category-discover-card">
-                  <div className="category-discover-icon">
-                    <img src="https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=64&h=64&fit=crop" alt="Books" />
-                  </div>
-                  <span className="category-discover-name">Books</span>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-              </div>
+              )}
               <button className="categories-nav-arrow">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1868,27 +4020,39 @@ function App() {
             <div className="categories-product-tabs">
               <button 
                 className={`category-product-tab ${categoryProductTab === 'all' ? 'active' : ''}`}
-                onClick={() => setCategoryProductTab('all')}
+                onClick={() => {
+                  setCategoryProductTab('all')
+                  setCategoryPage(1)
+                }}
               >
-                All Product (145)
+                All Product ({categoryProductCounts.all})
               </button>
               <button 
                 className={`category-product-tab ${categoryProductTab === 'featured' ? 'active' : ''}`}
-                onClick={() => setCategoryProductTab('featured')}
+                onClick={() => {
+                  setCategoryProductTab('featured')
+                  setCategoryPage(1)
+                }}
               >
-                Featured Products
+                Featured Products ({categoryProductCounts.featured})
               </button>
               <button 
                 className={`category-product-tab ${categoryProductTab === 'sale' ? 'active' : ''}`}
-                onClick={() => setCategoryProductTab('sale')}
+                onClick={() => {
+                  setCategoryProductTab('sale')
+                  setCategoryPage(1)
+                }}
               >
-                On Sale
+                On Sale ({categoryProductCounts.onSale})
               </button>
               <button 
                 className={`category-product-tab ${categoryProductTab === 'out-of-stock' ? 'active' : ''}`}
-                onClick={() => setCategoryProductTab('out-of-stock')}
+                onClick={() => {
+                  setCategoryProductTab('out-of-stock')
+                  setCategoryPage(1)
+                }}
               >
-                Out of Stock
+                Out of Stock ({categoryProductCounts.outOfStock})
               </button>
             </div>
             <div className="categories-product-controls">
@@ -1897,14 +4061,19 @@ function App() {
                   <path d="M7 13C10.3137 13 13 10.3137 13 7C13 3.68629 10.3137 1 7 1C3.68629 1 1 3.68629 1 7C1 10.3137 3.68629 13 7 13Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M15 15L11 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <input type="text" placeholder="Search your product" />
+                <input 
+                  type="text" 
+                  placeholder="Search your product" 
+                  value={categorySearch}
+                  onChange={(e) => setCategorySearch(e.target.value)}
+                />
               </div>
               <button className="categories-control-btn">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M2 4H14M4 8H12M6 12H10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
               </button>
-              <button className="categories-control-btn categories-add-btn">
+              <button className="categories-control-btn categories-add-btn" onClick={() => setActiveMenu('add-products')}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="2"/>
                   <path d="M8 5V11M5 8H11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
@@ -1936,25 +4105,49 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                <tr>
+                {categoryProductsLoading ? (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                      Loading products...
+                  </td>
+                </tr>
+                ) : categoryProductsError ? (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#ef4444' }}>
+                      Error: {categoryProductsError}
+                  </td>
+                </tr>
+                ) : categoryProducts.length > 0 ? (
+                  categoryProducts.map((product, index) => (
+                    <tr key={product.id || index}>
                   <td><input type="checkbox" /></td>
-                  <td>1</td>
+                      <td>{categoryOffset + index + 1}</td>
                   <td>
                     <div className="category-product-cell">
-                      <img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=40&h=40&fit=crop" alt="Wireless Bluetooth Headphones" />
-                      <span>Wireless Bluetooth Headphones</span>
+                          <img 
+                            src={product.image_url || product.main_image || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=40&h=40&fit=crop'} 
+                            alt={product.name || 'Product'} 
+                          />
+                          <span>{product.name || 'Unnamed Product'}</span>
                     </div>
                   </td>
-                  <td>01-01-2025</td>
-                  <td>25</td>
+                      <td>{product.created_at ? new Date(product.created_at).toLocaleDateString() : 'N/A'}</td>
+                      <td>{product.order_count || product.orders || 0}</td>
                   <td>
                     <div className="category-product-actions">
-                      <button className="category-action-btn">
+                          <button 
+                            className="category-action-btn" 
+                            title="Edit"
+                            onClick={() => {
+                              setEditingProductId(product.id)
+                              setActiveMenu('add-products')
+                            }}
+                          >
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M11.3333 2.66667C11.5084 2.49159 11.7163 2.35282 11.9447 2.25865C12.1731 2.16448 12.4173 2.11667 12.6667 2.11667C12.916 2.11667 13.1602 2.16448 13.3886 2.25865C13.617 2.35282 13.8249 2.49159 14 2.66667C14.1751 2.84175 14.3139 3.04966 14.408 3.27805C14.5022 3.50644 14.55 3.75065 14.55 4C14.55 4.24935 14.5022 4.49356 14.408 4.72195C14.3139 4.95034 14.1751 5.15825 14 5.33333L5.33333 14L2 14.6667L2.66667 11.3333L11.3333 2.66667Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </button>
-                      <button className="category-action-btn">
+                          <button className="category-action-btn" title="Delete">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
@@ -1962,279 +4155,90 @@ function App() {
                     </div>
                   </td>
                 </tr>
-                <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>1</td>
-                  <td>
-                    <div className="category-product-cell">
-                      <img src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=40&h=40&fit=crop" alt="Men's T-Shirt" />
-                      <span>Men's T-Shirt</span>
-                    </div>
-                  </td>
-                  <td>01-01-2025</td>
-                  <td>20</td>
-                  <td>
-                    <div className="category-product-actions">
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M11.3333 2.66667C11.5084 2.49159 11.7163 2.35282 11.9447 2.25865C12.1731 2.16448 12.4173 2.11667 12.6667 2.11667C12.916 2.11667 13.1602 2.16448 13.3886 2.25865C13.617 2.35282 13.8249 2.49159 14 2.66667C14.1751 2.84175 14.3139 3.04966 14.408 3.27805C14.5022 3.50644 14.55 3.75065 14.55 4C14.55 4.24935 14.5022 4.49356 14.408 4.72195C14.3139 4.95034 14.1751 5.15825 14 5.33333L5.33333 14L2 14.6667L2.66667 11.3333L11.3333 2.66667Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                    </div>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                      No products found
                   </td>
                 </tr>
-                <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>1</td>
-                  <td>
-                    <div className="category-product-cell">
-                      <img src="https://images.unsplash.com/photo-1627123424574-724758594e93?w=40&h=40&fit=crop" alt="Men's Leather Wallet" />
-                      <span>Men's Leather Wallet</span>
-                    </div>
-                  </td>
-                  <td>01-01-2025</td>
-                  <td>35</td>
-                  <td>
-                    <div className="category-product-actions">
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M11.3333 2.66667C11.5084 2.49159 11.7163 2.35282 11.9447 2.25865C12.1731 2.16448 12.4173 2.11667 12.6667 2.11667C12.916 2.11667 13.1602 2.16448 13.3886 2.25865C13.617 2.35282 13.8249 2.49159 14 2.66667C14.1751 2.84175 14.3139 3.04966 14.408 3.27805C14.5022 3.50644 14.55 3.75065 14.55 4C14.55 4.24935 14.5022 4.49356 14.408 4.72195C14.3139 4.95034 14.1751 5.15825 14 5.33333L5.33333 14L2 14.6667L2.66667 11.3333L11.3333 2.66667Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>1</td>
-                  <td>
-                    <div className="category-product-cell">
-                      <img src="https://images.unsplash.com/photo-1586953208448-b95a79798f07?w=40&h=40&fit=crop" alt="Memory Foam Pillow" />
-                      <span>Memory Foam Pillow</span>
-                    </div>
-                  </td>
-                  <td>01-01-2025</td>
-                  <td>40</td>
-                  <td>
-                    <div className="category-product-actions">
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M11.3333 2.66667C11.5084 2.49159 11.7163 2.35282 11.9447 2.25865C12.1731 2.16448 12.4173 2.11667 12.6667 2.11667C12.916 2.11667 13.1602 2.16448 13.3886 2.25865C13.617 2.35282 13.8249 2.49159 14 2.66667C14.1751 2.84175 14.3139 3.04966 14.408 3.27805C14.5022 3.50644 14.55 3.75065 14.55 4C14.55 4.24935 14.5022 4.49356 14.408 4.72195C14.3139 4.95034 14.1751 5.15825 14 5.33333L5.33333 14L2 14.6667L2.66667 11.3333L11.3333 2.66667Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>1</td>
-                  <td>
-                    <div className="category-product-cell">
-                      <img src="https://images.unsplash.com/photo-1517668808823-bac8d30bc8a6?w=40&h=40&fit=crop" alt="Coffee Maker" />
-                      <span>Coffee Maker</span>
-                    </div>
-                  </td>
-                  <td>01-01-2025</td>
-                  <td>45</td>
-                  <td>
-                    <div className="category-product-actions">
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M11.3333 2.66667C11.5084 2.49159 11.7163 2.35282 11.9447 2.25865C12.1731 2.16448 12.4173 2.11667 12.6667 2.11667C12.916 2.11667 13.1602 2.16448 13.3886 2.25865C13.617 2.35282 13.8249 2.49159 14 2.66667C14.1751 2.84175 14.3139 3.04966 14.408 3.27805C14.5022 3.50644 14.55 3.75065 14.55 4C14.55 4.24935 14.5022 4.49356 14.408 4.72195C14.3139 4.95034 14.1751 5.15825 14 5.33333L5.33333 14L2 14.6667L2.66667 11.3333L11.3333 2.66667Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>1</td>
-                  <td>
-                    <div className="category-product-cell">
-                      <img src="https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=40&h=40&fit=crop" alt="Casual Baseball Cap" />
-                      <span>Casual Baseball Cap</span>
-                    </div>
-                  </td>
-                  <td>01-01-2025</td>
-                  <td>55</td>
-                  <td>
-                    <div className="category-product-actions">
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M11.3333 2.66667C11.5084 2.49159 11.7163 2.35282 11.9447 2.25865C12.1731 2.16448 12.4173 2.11667 12.6667 2.11667C12.916 2.11667 13.1602 2.16448 13.3886 2.25865C13.617 2.35282 13.8249 2.49159 14 2.66667C14.1751 2.84175 14.3139 3.04966 14.408 3.27805C14.5022 3.50644 14.55 3.75065 14.55 4C14.55 4.24935 14.5022 4.49356 14.408 4.72195C14.3139 4.95034 14.1751 5.15825 14 5.33333L5.33333 14L2 14.6667L2.66667 11.3333L11.3333 2.66667Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>1</td>
-                  <td>
-                    <div className="category-product-cell">
-                      <img src="https://images.unsplash.com/photo-1587825140708-dfaf72ae4b04?w=40&h=40&fit=crop" alt="Full HD Webcam" />
-                      <span>Full HD Webcam</span>
-                    </div>
-                  </td>
-                  <td>01-01-2025</td>
-                  <td>20</td>
-                  <td>
-                    <div className="category-product-actions">
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M11.3333 2.66667C11.5084 2.49159 11.7163 2.35282 11.9447 2.25865C12.1731 2.16448 12.4173 2.11667 12.6667 2.11667C12.916 2.11667 13.1602 2.16448 13.3886 2.25865C13.617 2.35282 13.8249 2.49159 14 2.66667C14.1751 2.84175 14.3139 3.04966 14.408 3.27805C14.5022 3.50644 14.55 3.75065 14.55 4C14.55 4.24935 14.5022 4.49356 14.408 4.72195C14.3139 4.95034 14.1751 5.15825 14 5.33333L5.33333 14L2 14.6667L2.66667 11.3333L11.3333 2.66667Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>1</td>
-                  <td>
-                    <div className="category-product-cell">
-                      <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=40&h=40&fit=crop" alt="Smart LED Color Bulb" />
-                      <span>Smart LED Color Bulb</span>
-                    </div>
-                  </td>
-                  <td>01-01-2025</td>
-                  <td>16</td>
-                  <td>
-                    <div className="category-product-actions">
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M11.3333 2.66667C11.5084 2.49159 11.7163 2.35282 11.9447 2.25865C12.1731 2.16448 12.4173 2.11667 12.6667 2.11667C12.916 2.11667 13.1602 2.16448 13.3886 2.25865C13.617 2.35282 13.8249 2.49159 14 2.66667C14.1751 2.84175 14.3139 3.04966 14.408 3.27805C14.5022 3.50644 14.55 3.75065 14.55 4C14.55 4.24935 14.5022 4.49356 14.408 4.72195C14.3139 4.95034 14.1751 5.15825 14 5.33333L5.33333 14L2 14.6667L2.66667 11.3333L11.3333 2.66667Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>1</td>
-                  <td>
-                    <div className="category-product-cell">
-                      <img src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=40&h=40&fit=crop" alt="Men's T-Shirt" />
-                      <span>Men's T-Shirt</span>
-                    </div>
-                  </td>
-                  <td>01-01-2025</td>
-                  <td>10</td>
-                  <td>
-                    <div className="category-product-actions">
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M11.3333 2.66667C11.5084 2.49159 11.7163 2.35282 11.9447 2.25865C12.1731 2.16448 12.4173 2.11667 12.6667 2.11667C12.916 2.11667 13.1602 2.16448 13.3886 2.25865C13.617 2.35282 13.8249 2.49159 14 2.66667C14.1751 2.84175 14.3139 3.04966 14.408 3.27805C14.5022 3.50644 14.55 3.75065 14.55 4C14.55 4.24935 14.5022 4.49356 14.408 4.72195C14.3139 4.95034 14.1751 5.15825 14 5.33333L5.33333 14L2 14.6667L2.66667 11.3333L11.3333 2.66667Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>1</td>
-                  <td>
-                    <div className="category-product-cell">
-                      <img src="https://images.unsplash.com/photo-1627123424574-724758594e93?w=40&h=40&fit=crop" alt="Men's Leather Wallet" />
-                      <span>Men's Leather Wallet</span>
-                    </div>
-                  </td>
-                  <td>01-01-2025</td>
-                  <td>35</td>
-                  <td>
-                    <div className="category-product-actions">
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M11.3333 2.66667C11.5084 2.49159 11.7163 2.35282 11.9447 2.25865C12.1731 2.16448 12.4173 2.11667 12.6667 2.11667C12.916 2.11667 13.1602 2.16448 13.3886 2.25865C13.617 2.35282 13.8249 2.49159 14 2.66667C14.1751 2.84175 14.3139 3.04966 14.408 3.27805C14.5022 3.50644 14.55 3.75065 14.55 4C14.55 4.24935 14.5022 4.49356 14.408 4.72195C14.3139 4.95034 14.1751 5.15825 14 5.33333L5.33333 14L2 14.6667L2.66667 11.3333L11.3333 2.66667Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      <button className="category-action-btn">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                )}
               </tbody>
             </table>
           </div>
 
           {/* Pagination */}
+          {(() => {
+            const totalPages = Math.ceil(categoryTotalCount / categoryLimit) || 1
+            const currentPage = categoryPage
+            
+            // Generate page numbers
+            const pages = []
+            if (totalPages <= 7) {
+              // Show all pages if 7 or fewer
+              for (let i = 1; i <= totalPages; i++) {
+                pages.push(i)
+              }
+            } else {
+              // Show first page
+              pages.push(1)
+              
+              if (currentPage > 3) {
+                pages.push('ellipsis-start')
+              }
+              
+              // Show pages around current page
+              const start = Math.max(2, currentPage - 1)
+              const end = Math.min(totalPages - 1, currentPage + 1)
+              
+              for (let i = start; i <= end; i++) {
+                pages.push(i)
+              }
+              
+              if (currentPage < totalPages - 2) {
+                pages.push('ellipsis-end')
+              }
+              
+              // Show last page
+              pages.push(totalPages)
+            }
+            
+            return (
           <div className="order-pagination">
             <button 
               className="pagination-btn"
               onClick={() => setCategoryPage(Math.max(1, categoryPage - 1))}
-              disabled={categoryPage === 1}
+                  disabled={categoryPage === 1 || categoryProductsLoading}
             >
               ← Previous
             </button>
             <div className="pagination-numbers">
-              {[1, 2, 3, 4, 5].map((num) => (
+                  {pages.map((page, index) => {
+                    if (page === 'ellipsis-start' || page === 'ellipsis-end') {
+                      return <span key={`ellipsis-${index}`} className="pagination-ellipsis">...</span>
+                    }
+                    return (
                 <button
-                  key={num}
-                  className={`pagination-number ${categoryPage === num ? 'active' : ''}`}
-                  onClick={() => setCategoryPage(num)}
-                >
-                  {num}
+                        key={page}
+                        className={`pagination-number ${categoryPage === page ? 'active' : ''}`}
+                        onClick={() => setCategoryPage(page)}
+                        disabled={categoryProductsLoading}
+                      >
+                        {page}
                 </button>
-              ))}
-              <span className="pagination-ellipsis">...</span>
-              <button
-                className={`pagination-number ${categoryPage === 24 ? 'active' : ''}`}
-                onClick={() => setCategoryPage(24)}
-              >
-                24
-              </button>
+                    )
+                  })}
             </div>
             <button 
               className="pagination-btn"
-              onClick={() => setCategoryPage(Math.min(24, categoryPage + 1))}
-              disabled={categoryPage === 24}
+                  onClick={() => setCategoryPage(Math.min(totalPages, categoryPage + 1))}
+                  disabled={categoryPage >= totalPages || categoryProductsLoading}
             >
               Next →
             </button>
           </div>
+            )
+          })()}
         </div>
         )}
 
@@ -2429,6 +4433,1041 @@ function App() {
         {activeMenu === 'product-reviews' && (
           <div className="dashboard-content">
             <ProductReviewsPage />
+          </div>
+        )}
+
+        {/* Promotional Banner Create/Edit Modal */}
+        {isBannerModalOpen && (
+          <div 
+            className="modal-overlay"
+            onClick={() => setIsBannerModalOpen(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '1rem'
+            }}
+          >
+            <div 
+              style={{
+                backgroundColor: 'white',
+                borderRadius: '12px',
+                width: '100%',
+                maxWidth: '900px',
+                maxHeight: '90vh',
+                overflow: 'auto',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div style={{
+                padding: '1.5rem',
+                borderBottom: '1px solid #e5e7eb',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <h2 style={{
+                  fontSize: '1.5rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  margin: 0
+                }}>
+                  {selectedBanner ? 'Edit Promotional Banner' : 'Create New Promotional Banner'}
+                </h2>
+                <button
+                  onClick={() => setIsBannerModalOpen(false)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div style={{ padding: '1.5rem' }}>
+                <form onSubmit={async (e) => {
+                  e.preventDefault()
+                  await handleBannerSubmit()
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    {/* Preview Section */}
+                    <div style={{
+                      padding: '2rem',
+                      borderRadius: '8px',
+                      backgroundColor: bannerFormData.backgroundColor || '#FEF3C7',
+                      minHeight: '200px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1 }}>
+                          {bannerFormData.headerText && (
+                            <p style={{ fontSize: '0.75rem', color: '#10b981', marginBottom: '0.5rem' }}>
+                              {bannerFormData.headerText}
+                            </p>
+                          )}
+                          {bannerFormData.subtitle && (
+                            <p style={{ fontSize: '0.875rem', color: '#374151', marginBottom: '0.5rem' }}>
+                              {bannerFormData.subtitle}
+                            </p>
+                          )}
+                          {bannerFormData.mainTitle && (
+                            <h3 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#111827', marginBottom: '1rem' }}>
+                              {bannerFormData.mainTitle}
+                            </h3>
+                          )}
+                          {bannerFormData.buttonText && (
+                            <button style={{
+                              padding: '0.75rem 1.5rem',
+                              backgroundColor: '#10b981',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              cursor: 'pointer'
+                            }}>
+                              {bannerFormData.buttonText}
+                            </button>
+                          )}
+                        </div>
+                        {bannerFormData.productImage && (
+                          <div style={{ width: '150px', height: '150px', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.3)' }}>
+                            <img 
+                              src={bannerFormData.productImage} 
+                              alt="Product" 
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={(e) => {
+                                e.target.style.display = 'none'
+                                e.target.parentElement.style.backgroundColor = 'rgba(255,255,255,0.5)'
+                                e.target.parentElement.innerHTML = '<span style="color: #6b7280; font-size: 0.875rem; display: flex; align-items: center; justify-content: center; height: 100%;">Product Image</span>'
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Text Fields */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Header Text (e.g., "// Todays Hot Deals")
+                      </label>
+                      <input
+                        type="text"
+                        value={bannerFormData.headerText}
+                        onChange={(e) => setBannerFormData({ ...bannerFormData, headerText: e.target.value })}
+                        placeholder="// Todays Hot Deals"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Subtitle (e.g., "ORIGINAL STOCK")
+                      </label>
+                      <input
+                        type="text"
+                        value={bannerFormData.subtitle}
+                        onChange={(e) => setBannerFormData({ ...bannerFormData, subtitle: e.target.value })}
+                        placeholder="ORIGINAL STOCK"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Main Title <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={bannerFormData.mainTitle}
+                        onChange={(e) => setBannerFormData({ ...bannerFormData, mainTitle: e.target.value })}
+                        placeholder="HONEY COMBO PACKAGE"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+
+                    {/* Countdown Timer */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Countdown End Date
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={bannerFormData.countdownEndDate}
+                        onChange={(e) => setBannerFormData({ ...bannerFormData, countdownEndDate: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+
+                    {/* Button Settings */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                          Button Text
+                        </label>
+                        <input
+                          type="text"
+                          value={bannerFormData.buttonText}
+                          onChange={(e) => setBannerFormData({ ...bannerFormData, buttonText: e.target.value })}
+                          placeholder="SHOP NOW"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '8px',
+                            fontSize: '0.875rem'
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                          Button Link
+                        </label>
+                        <input
+                          type="text"
+                          value={bannerFormData.buttonLink}
+                          onChange={(e) => setBannerFormData({ ...bannerFormData, buttonLink: e.target.value })}
+                          placeholder="/products"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '8px',
+                            fontSize: '0.875rem'
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Image URLs */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                          Product Image URL
+                        </label>
+                        <input
+                          type="url"
+                          value={bannerFormData.productImage || ''}
+                          onChange={(e) => setBannerFormData({ ...bannerFormData, productImage: e.target.value })}
+                          placeholder="https://example.com/product.jpg"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '8px',
+                            fontSize: '0.875rem'
+                          }}
+                        />
+                        {bannerFormData.productImage && (
+                          <img 
+                            src={bannerFormData.productImage} 
+                            alt="Product preview" 
+                            style={{
+                              marginTop: '0.5rem',
+                              maxWidth: '100%',
+                              maxHeight: '150px',
+                              borderRadius: '8px',
+                              border: '1px solid #e5e7eb'
+                            }}
+                            onError={(e) => {
+                              e.target.style.display = 'none'
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                          Background Image URL (Optional)
+                        </label>
+                        <input
+                          type="url"
+                          value={bannerFormData.backgroundImage || ''}
+                          onChange={(e) => setBannerFormData({ ...bannerFormData, backgroundImage: e.target.value })}
+                          placeholder="https://example.com/background.jpg"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '8px',
+                            fontSize: '0.875rem'
+                          }}
+                        />
+                        {bannerFormData.backgroundImage && (
+                          <img 
+                            src={bannerFormData.backgroundImage} 
+                            alt="Background preview" 
+                            style={{
+                              marginTop: '0.5rem',
+                              maxWidth: '100%',
+                              maxHeight: '150px',
+                              borderRadius: '8px',
+                              border: '1px solid #e5e7eb'
+                            }}
+                            onError={(e) => {
+                              e.target.style.display = 'none'
+                            }}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Background Color */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Background Color
+                      </label>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <input
+                          type="color"
+                          value={bannerFormData.backgroundColor}
+                          onChange={(e) => setBannerFormData({ ...bannerFormData, backgroundColor: e.target.value })}
+                          style={{
+                            width: '60px',
+                            height: '40px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '8px',
+                            cursor: 'pointer'
+                          }}
+                        />
+                        <input
+                          type="text"
+                          value={bannerFormData.backgroundColor}
+                          onChange={(e) => setBannerFormData({ ...bannerFormData, backgroundColor: e.target.value })}
+                          placeholder="#FEF3C7"
+                          style={{
+                            flex: 1,
+                            padding: '0.75rem',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '8px',
+                            fontSize: '0.875rem'
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Active Status */}
+                    <div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={bannerFormData.isActive}
+                          onChange={(e) => setBannerFormData({ ...bannerFormData, isActive: e.target.checked })}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                        />
+                        <span style={{ fontSize: '0.875rem', color: '#374151' }}>Active (Show on frontend)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '1rem',
+                    marginTop: '2rem',
+                    paddingTop: '1.5rem',
+                    borderTop: '1px solid #e5e7eb'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsBannerModalOpen(false)}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: 'transparent',
+                        color: '#6b7280',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={bannerSubmitting}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: bannerSubmitting ? '#9ca3af' : '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        cursor: bannerSubmitting ? 'not-allowed' : 'pointer',
+                        opacity: bannerSubmitting ? 0.7 : 1
+                      }}
+                    >
+                      {bannerSubmitting ? 'Saving...' : selectedBanner ? 'Update Banner' : 'Create Banner'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeMenu === 'product-media' && (
+          <div className="dashboard-content">
+            <h1 className="dashboard-title">Product Media</h1>
+            
+            {/* Tabs */}
+            <div style={{
+              display: 'flex',
+              gap: '0.5rem',
+              marginBottom: '2rem',
+              borderBottom: '2px solid #e5e7eb'
+            }}>
+              <button
+                onClick={() => setProductMediaTab('media')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  border: 'none',
+                  background: 'transparent',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: productMediaTab === 'media' ? '#10b981' : '#6b7280',
+                  borderBottom: productMediaTab === 'media' ? '2px solid #10b981' : '2px solid transparent',
+                  marginBottom: '-2px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Media Library
+              </button>
+              <button
+                onClick={() => setProductMediaTab('banners')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  border: 'none',
+                  background: 'transparent',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: productMediaTab === 'banners' ? '#10b981' : '#6b7280',
+                  borderBottom: productMediaTab === 'banners' ? '2px solid #10b981' : '2px solid transparent',
+                  marginBottom: '-2px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Promotional Banners
+              </button>
+            </div>
+
+            {productMediaTab === 'media' && (
+              <>
+            {/* Upload Section */}
+            <div style={{
+              background: 'white',
+              borderRadius: '12px',
+              padding: '2rem',
+              marginBottom: '2rem',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1.5rem'
+              }}>
+                <h2 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  margin: 0
+                }}>
+                  Upload Media
+                </h2>
+                <button
+                  onClick={() => {
+                    const input = document.createElement('input')
+                    input.type = 'file'
+                    input.accept = 'image/*,video/*'
+                    input.multiple = true
+                    input.onchange = (e) => {
+                      // Handle file upload
+                      console.log('Files selected:', e.target.files)
+                    }
+                    input.click()
+                  }}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Upload Files
+                </button>
+              </div>
+              
+              <div style={{
+                border: '2px dashed #d1d5db',
+                borderRadius: '8px',
+                padding: '3rem',
+                textAlign: 'center',
+                backgroundColor: '#f9fafb',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                e.currentTarget.style.borderColor = '#10b981'
+                e.currentTarget.style.backgroundColor = '#f0fdf4'
+              }}
+              onDragLeave={(e) => {
+                e.currentTarget.style.borderColor = '#d1d5db'
+                e.currentTarget.style.backgroundColor = '#f9fafb'
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                e.currentTarget.style.borderColor = '#d1d5db'
+                e.currentTarget.style.backgroundColor = '#f9fafb'
+                const files = Array.from(e.dataTransfer.files)
+                console.log('Files dropped:', files)
+              }}
+              onClick={() => {
+                const input = document.createElement('input')
+                input.type = 'file'
+                input.accept = 'image/*,video/*'
+                input.multiple = true
+                input.onchange = (e) => {
+                  console.log('Files selected:', e.target.files)
+                }
+                input.click()
+              }}
+              >
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ margin: '0 auto 1rem', opacity: 0.5 }}>
+                  <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M17 8L12 3M12 3L7 8M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <p style={{
+                  fontSize: '1rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  margin: '0.5rem 0'
+                }}>
+                  Drag and drop files here, or click to browse
+                </p>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  margin: 0
+                }}>
+                  Supports images and videos (JPG, PNG, GIF, MP4, etc.)
+                </p>
+              </div>
+            </div>
+
+            {/* Media Gallery */}
+            <div style={{
+              background: 'white',
+              borderRadius: '12px',
+              padding: '2rem',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1.5rem'
+              }}>
+                <h2 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  margin: 0
+                }}>
+                  Media Library
+                </h2>
+                <div style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  alignItems: 'center'
+                }}>
+                  <div style={{
+                    position: 'relative'
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: '#6b7280'
+                    }}>
+                      <path d="M7 13C10.3137 13 13 10.3137 13 7C13 3.68629 10.3137 1 7 1C3.68629 1 1 3.68629 1 7C1 10.3137 3.68629 13 7 13Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M15 15L11 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search media..."
+                      style={{
+                        padding: '0.5rem 0.75rem 0.5rem 2.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem',
+                        width: '250px'
+                      }}
+                    />
+                  </div>
+                  <select style={{
+                    padding: '0.5rem 0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'white'
+                  }}>
+                    <option>All Media</option>
+                    <option>Images</option>
+                    <option>Videos</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Media Grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                gap: '1rem'
+              }}>
+                {/* Placeholder media items */}
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((item) => (
+                  <div
+                    key={item}
+                    style={{
+                      position: 'relative',
+                      aspectRatio: '1',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      backgroundColor: '#f3f4f6',
+                      border: '1px solid #e5e7eb',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.02)'
+                      e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  >
+                    <div style={{
+                      position: 'absolute',
+                      top: '0.5rem',
+                      right: '0.5rem',
+                      display: 'flex',
+                      gap: '0.25rem',
+                      zIndex: 10
+                    }}>
+                      <button
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '6px',
+                          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                          border: 'none',
+                          color: 'white',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title="Edit"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M11.3333 2.66667C11.5084 2.49159 11.7163 2.35282 11.9447 2.25865C12.1731 2.16448 12.4173 2.11667 12.6667 2.11667C12.916 2.11667 13.1602 2.16448 13.3886 2.25865C13.617 2.35282 13.8249 2.49159 14 2.66667C14.1751 2.84175 14.3139 3.04966 14.408 3.27805C14.5022 3.50644 14.55 3.75065 14.55 4C14.55 4.24935 14.5022 4.49356 14.408 4.72195C14.3139 4.95034 14.1751 5.15825 14 5.33333L5.33333 14L2 14.6667L2.66667 11.3333L11.3333 2.66667Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                      <button
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '6px',
+                          backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                          border: 'none',
+                          color: 'white',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title="Delete"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#9ca3af'
+                    }}>
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 16L12 8L16 12L20 8V16C20 17.1046 19.1046 18 18 18H4C2.89543 18 2 17.1046 2 16V4C2 2.89543 2.89543 2 4 2H12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="2"/>
+                      </svg>
+                    </div>
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      padding: '0.75rem',
+                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                      color: 'white',
+                      fontSize: '0.75rem'
+                    }}>
+                      <div style={{ fontWeight: '500', marginBottom: '0.25rem' }}>image-{item}.jpg</div>
+                      <div style={{ opacity: 0.8 }}>2.5 MB • 1920x1080</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Empty State (commented out, shown when no media) */}
+              {/* <div style={{
+                textAlign: 'center',
+                padding: '4rem 2rem',
+                color: '#6b7280'
+              }}>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ margin: '0 auto 1rem', opacity: 0.5 }}>
+                  <path d="M4 16L12 8L16 12L20 8V16C20 17.1046 19.1046 18 18 18H4C2.89543 18 2 17.1046 2 16V4C2 2.89543 2.89543 2 4 2H12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="2"/>
+                </svg>
+                <p style={{ fontSize: '1rem', fontWeight: '500', marginBottom: '0.5rem' }}>No media files yet</p>
+                <p style={{ fontSize: '0.875rem' }}>Upload your first image or video to get started</p>
+              </div> */}
+            </div>
+              </>
+            )}
+
+            {productMediaTab === 'banners' && (
+              <>
+                {/* Promotional Banners Section */}
+                <div style={{
+                  background: 'white',
+                  borderRadius: '12px',
+                  padding: '2rem',
+                  marginBottom: '2rem',
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <h2 style={{
+                      fontSize: '1.25rem',
+                      fontWeight: '600',
+                      color: '#111827',
+                      margin: 0
+                    }}>
+                      Promotional Banners
+                    </h2>
+                    <button
+                      onClick={() => {
+                        setSelectedBanner(null)
+                        setBannerFormData({
+                          title: '',
+                          subtitle: '',
+                          headerText: '',
+                          mainTitle: '',
+                          countdownDays: '',
+                          countdownHours: '',
+                          countdownMinutes: '',
+                          countdownSeconds: '',
+                          countdownEndDate: '',
+                          buttonText: 'SHOP NOW',
+                          buttonLink: '/products',
+                          backgroundColor: '#FEF3C7',
+                          productImage: '',
+                          backgroundImage: '',
+                          isActive: true
+                        })
+                        setIsBannerModalOpen(true)
+                      }}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      Create Banner
+                    </button>
+                  </div>
+
+                  {/* Banners List */}
+                  {promotionalBannersLoading ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                      Loading banners...
+                    </div>
+                  ) : promotionalBannersError ? (
+                    <div style={{ padding: '1rem', color: '#991b1b', background: '#fef2f2', borderRadius: '8px' }}>
+                      Error: {promotionalBannersError}
+                    </div>
+                  ) : promotionalBanners.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '4rem 2rem', color: '#6b7280' }}>
+                      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ margin: '0 auto 1rem', opacity: 0.5 }}>
+                        <path d="M4 16L12 8L16 12L20 8V16C20 17.1046 19.1046 18 18 18H4C2.89543 18 2 17.1046 2 16V4C2 2.89543 2.89543 2 4 2H12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="2"/>
+                      </svg>
+                      <p style={{ fontSize: '1rem', fontWeight: '500', marginBottom: '0.5rem' }}>No promotional banners yet</p>
+                      <p style={{ fontSize: '0.875rem' }}>Create your first promotional banner to get started</p>
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
+                      gap: '1.5rem'
+                    }}>
+                      {promotionalBanners.map((banner) => (
+                        <div
+                          key={banner.id}
+                          style={{
+                            position: 'relative',
+                            borderRadius: '12px',
+                            overflow: 'hidden',
+                            border: '1px solid #e5e7eb',
+                            backgroundColor: banner.backgroundColor || '#FEF3C7',
+                            minHeight: '300px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-4px)'
+                            e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)'
+                            e.currentTarget.style.boxShadow = 'none'
+                          }}
+                          onClick={() => {
+                            setSelectedBanner(banner)
+                            // Format countdownEndDate from ISO to datetime-local format
+                            let formattedDate = ''
+                            if (banner.countdownEndDate) {
+                              try {
+                                const date = new Date(banner.countdownEndDate)
+                                if (!isNaN(date.getTime())) {
+                                  // Convert to YYYY-MM-DDTHH:mm format for datetime-local input
+                                  const year = date.getFullYear()
+                                  const month = String(date.getMonth() + 1).padStart(2, '0')
+                                  const day = String(date.getDate()).padStart(2, '0')
+                                  const hours = String(date.getHours()).padStart(2, '0')
+                                  const minutes = String(date.getMinutes()).padStart(2, '0')
+                                  formattedDate = `${year}-${month}-${day}T${hours}:${minutes}`
+                                }
+                              } catch (e) {
+                                console.error('Error formatting date:', e)
+                              }
+                            }
+                            setBannerFormData({
+                              title: banner.title || '',
+                              subtitle: banner.subtitle || '',
+                              headerText: banner.headerText || '',
+                              mainTitle: banner.mainTitle || '',
+                              countdownDays: banner.countdownDays || '',
+                              countdownHours: banner.countdownHours || '',
+                              countdownMinutes: banner.countdownMinutes || '',
+                              countdownSeconds: banner.countdownSeconds || '',
+                              countdownEndDate: formattedDate,
+                              buttonText: banner.buttonText || 'SHOP NOW',
+                              buttonLink: banner.buttonLink || '/products',
+                              backgroundColor: banner.backgroundColor || '#FEF3C7',
+                              productImage: banner.productImage || '',
+                              backgroundImage: banner.backgroundImage || '',
+                              isActive: banner.isActive !== false
+                            })
+                            setIsBannerModalOpen(true)
+                          }}
+                        >
+                          {/* Preview Content */}
+                          <div style={{
+                            padding: '2rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            height: '100%',
+                            minHeight: '300px'
+                          }}>
+                            <div>
+                              {banner.headerText && (
+                                <p style={{ fontSize: '0.75rem', color: '#10b981', marginBottom: '0.5rem' }}>
+                                  {banner.headerText}
+                                </p>
+                              )}
+                              {banner.subtitle && (
+                                <p style={{ fontSize: '0.875rem', color: '#374151', marginBottom: '0.5rem' }}>
+                                  {banner.subtitle}
+                                </p>
+                              )}
+                              {banner.mainTitle && (
+                                <h3 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#111827', marginBottom: '1rem' }}>
+                                  {banner.mainTitle}
+                                </h3>
+                              )}
+                            </div>
+                            {banner.buttonText && (
+                              <button style={{
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: '#10b981',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                width: 'fit-content',
+                                cursor: 'pointer'
+                              }}>
+                                {banner.buttonText}
+                              </button>
+                            )}
+                          </div>
+                          
+                          {/* Action Buttons */}
+                          <div style={{
+                            position: 'absolute',
+                            top: '0.5rem',
+                            right: '0.5rem',
+                            display: 'flex',
+                            gap: '0.5rem'
+                          }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                // Toggle active status
+                              }}
+                              style={{
+                                padding: '0.5rem',
+                                borderRadius: '6px',
+                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                border: '1px solid #e5e7eb',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              title={banner.isActive ? 'Deactivate' : 'Activate'}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                {banner.isActive ? (
+                                  <>
+                                    <path d="M8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z" stroke="currentColor" strokeWidth="2"/>
+                                    <path d="M6 8L7.5 9.5L10 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </>
+                                ) : (
+                                  <>
+                                    <path d="M8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z" stroke="currentColor" strokeWidth="2"/>
+                                    <path d="M6 8H10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                  </>
+                                )}
+                              </svg>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (window.confirm('Are you sure you want to delete this banner?')) {
+                                  // Handle delete
+                                }
+                              }}
+                              style={{
+                                padding: '0.5rem',
+                                borderRadius: '6px',
+                                backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                                border: 'none',
+                                color: 'white',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              title="Delete"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M2 4H14M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
       </main>
