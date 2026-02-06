@@ -148,6 +148,8 @@ function App() {
   const [chatUsersError, setChatUsersError] = useState(null)
   const [selectedChatUser, setSelectedChatUser] = useState(null)
   const [messages, setMessages] = useState({}) // { userId: [messages] }
+  const [messageTitle, setMessageTitle] = useState('')
+  const [messageSubtitle, setMessageSubtitle] = useState('')
   const [newMessage, setNewMessage] = useState('')
   const [sendingMessage, setSendingMessage] = useState(false)
   const [messageSearch, setMessageSearch] = useState('')
@@ -422,7 +424,15 @@ function App() {
       const offset = (currentPage - 1) * 10
       const endpoint = `/api/admin/dashboard/orders?limit=10&offset=${offset}${status ? `&status=${status}` : ''}`
       const data = await apiCall(endpoint)
-      setOrders(data.orders || [])
+      const ordersList = data.orders || []
+      
+      // Log first order to debug structure
+      if (ordersList.length > 0) {
+        console.log('Sample order structure:', ordersList[0])
+        console.log('Order UUID field:', ordersList[0].uuid || ordersList[0].id || ordersList[0]._id || ordersList[0].order_id || ordersList[0].order_uuid || 'NOT FOUND')
+      }
+      
+      setOrders(ordersList)
     } catch (error) {
       console.error('Error fetching orders:', error)
       setOrdersError(error.message)
@@ -523,13 +533,16 @@ function App() {
   // Delete order
   const deleteOrder = async (orderUuid) => {
     try {
+      console.log('Attempting to delete order with UUID:', orderUuid)
+      console.log('API endpoint:', `/api/admin/orders/${orderUuid}`)
+      
       await apiCall(`/api/admin/orders/${orderUuid}`, {
         method: 'DELETE'
       })
       
       // Remove order from local state (match by UUID or ID)
       setOrders(prevOrders => prevOrders.filter(order => {
-        const orderUuidValue = order.uuid || order.id
+        const orderUuidValue = order.uuid || order.id || order._id || order.order_id || order.order_uuid
         return orderUuidValue !== orderUuid
       }))
       
@@ -538,8 +551,10 @@ function App() {
       
       // Show success notification
       console.log(`Order ${orderUuid} deleted successfully`)
+      alert('Order deleted successfully!')
     } catch (error) {
       console.error('Error deleting order:', error)
+      console.error('Order UUID used:', orderUuid)
       alert(`Failed to delete order: ${error.message}`)
     }
   }
@@ -929,23 +944,27 @@ function App() {
     try {
       const messageData = {
         userId: selectedChatUser.id,
-        message: newMessage.trim(),
-        timestamp: new Date().toISOString()
+        title: messageTitle.trim() || '',
+        subtitle: messageSubtitle.trim() || '',
+        message: newMessage.trim()
       }
 
-      // Try to send via API, or just add locally if endpoint doesn't exist
+      // Send notification via API
       try {
-        await apiCall('/api/admin/messages', {
+        await apiCall('/api/admin/notifications', {
           method: 'POST',
           body: JSON.stringify(messageData)
         })
       } catch (apiError) {
-        console.log('Send message API not available, storing locally')
+        console.error('Error sending notification:', apiError)
+        throw apiError
       }
 
       // Add message to local state
       const newMsg = {
         id: Date.now(),
+        title: messageTitle.trim() || null,
+        subtitle: messageSubtitle.trim() || null,
         message: newMessage.trim(),
         sender: 'admin',
         receiver: selectedChatUser.id,
@@ -958,6 +977,9 @@ function App() {
         [selectedChatUser.id]: [...(prev[selectedChatUser.id] || []), newMsg]
       }))
 
+      // Clear form fields
+      setMessageTitle('')
+      setMessageSubtitle('')
       setNewMessage('')
     } catch (error) {
       console.error('Error sending message:', error)
@@ -1423,37 +1445,6 @@ function App() {
                 </svg>
               </div>
               Product Reviews
-            </a>
-          </div>
-
-          <div className="menu-section">
-            <div className="menu-section-title">Admin</div>
-            <a 
-              href="#admin-role" 
-              className={`menu-item ${activeMenu === 'admin-role' ? 'active' : ''}`}
-              onClick={(e) => { e.preventDefault(); setActiveMenu('admin-role'); }}
-            >
-              <div className="menu-item-icon">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M10 12C12.2091 12 14 10.2091 14 8C14 5.79086 12.2091 4 10 4C7.79086 4 6 5.79086 6 8C6 10.2091 7.79086 12 10 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M3 17C3 14.7909 5.79086 13 10 13C14.2091 13 17 14.7909 17 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              Admin role
-            </a>
-            <a 
-              href="#control-authority" 
-              className={`menu-item ${activeMenu === 'control-authority' ? 'active' : ''}`}
-              onClick={(e) => { e.preventDefault(); setActiveMenu('control-authority'); }}
-            >
-              <div className="menu-item-icon">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M10 12C12.2091 12 14 10.2091 14 8C14 5.79086 12.2091 4 10 4C7.79086 4 6 5.79086 6 8C6 10.2091 7.79086 12 10 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M10 12V16M10 16L8 18M10 16L12 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M3 17C3 14.7909 5.79086 13 10 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              Control Authority
             </a>
           </div>
         </nav>
@@ -2270,8 +2261,17 @@ function App() {
                               className="order-action-btn delete-btn"
                               onClick={() => {
                                 const trackingNum = order.tracking_number || order.trackingNumber || order.tracking_code || order.trackingCode || 'N/A'
-                                const orderUuid = order.uuid || order.id
+                                // Try multiple possible UUID fields
+                                const orderUuid = order.uuid || order.id || order._id || order.order_id || order.order_uuid
+                                
+                                if (!orderUuid) {
+                                  console.error('Order object:', order)
+                                  alert('Error: Could not find order UUID. Please check the console for details.')
+                                  return
+                                }
+                                
                                 if (window.confirm(`Are you sure you want to delete order with tracking number "${trackingNum}"? This action cannot be undone.`)) {
+                                  console.log('Deleting order with UUID:', orderUuid)
                                   deleteOrder(orderUuid)
                                 }
                               }}
@@ -3888,6 +3888,12 @@ function App() {
                               className={`messages-message ${isAdmin ? 'admin' : 'user'}`}
                             >
                               <div className="messages-message-content">
+                                {msg.title && (
+                                  <div className="messages-message-title">{msg.title}</div>
+                                )}
+                                {msg.subtitle && (
+                                  <div className="messages-message-subtitle">{msg.subtitle}</div>
+                                )}
                                 <div className="messages-message-text">{msg.message}</div>
                                 <div className="messages-message-time">{timeStr}</div>
                               </div>
@@ -3907,24 +3913,44 @@ function App() {
                   </div>
 
                   <div className="messages-chat-input">
-                    <input
-                      type="text"
-                      placeholder="Type a message..."
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault()
-                          sendMessage()
-                        }
-                      }}
-                      disabled={sendingMessage}
-                    />
-                    <button
-                      className="messages-send-btn"
-                      onClick={sendMessage}
-                      disabled={!newMessage.trim() || sendingMessage}
-                    >
+                    <div className="messages-input-fields">
+                      <input
+                        type="text"
+                        className="messages-title-input"
+                        placeholder="Message Title (optional)"
+                        value={messageTitle}
+                        onChange={(e) => setMessageTitle(e.target.value)}
+                        disabled={sendingMessage}
+                      />
+                      <input
+                        type="text"
+                        className="messages-subtitle-input"
+                        placeholder="Message Subtitle (optional)"
+                        value={messageSubtitle}
+                        onChange={(e) => setMessageSubtitle(e.target.value)}
+                        disabled={sendingMessage}
+                      />
+                    </div>
+                    <div className="messages-chat-input-wrapper">
+                      <textarea
+                        className="messages-message-input"
+                        placeholder="Type your message..."
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && e.ctrlKey) {
+                            e.preventDefault()
+                            sendMessage()
+                          }
+                        }}
+                        disabled={sendingMessage}
+                        rows="3"
+                      />
+                      <button
+                        className="messages-send-btn"
+                        onClick={sendMessage}
+                        disabled={!newMessage.trim() || sendingMessage}
+                      >
                       {sendingMessage ? (
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="spinner">
                           <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="2" strokeDasharray="32" strokeDashoffset="24" fill="none">
@@ -3937,7 +3963,8 @@ function App() {
                           <path d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       )}
-                    </button>
+                      </button>
+                    </div>
                   </div>
                 </>
               ) : (
