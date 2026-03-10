@@ -155,6 +155,26 @@ function App() {
   const [messageSearch, setMessageSearch] = useState('')
   const messagesEndRef = useRef(null)
 
+  // News Letters state
+  const [newsletterSubscribers, setNewsletterSubscribers] = useState([])
+  const [newsletterSubscribersLoading, setNewsletterSubscribersLoading] = useState(false)
+  const [newsletterSubscribersError, setNewsletterSubscribersError] = useState(null)
+  const [newsletterTab, setNewsletterTab] = useState('subscribers') // 'subscribers' | 'send'
+  const [sendNewsletterSubject, setSendNewsletterSubject] = useState('')
+  const [sendNewsletterBody, setSendNewsletterBody] = useState('')
+  const [sendNewsletterSending, setSendNewsletterSending] = useState(false)
+  const [sendNewsletterError, setSendNewsletterError] = useState(null)
+  const [sendNewsletterSuccess, setSendNewsletterSuccess] = useState(null)
+  const [sendNewsletterResponse, setSendNewsletterResponse] = useState(null) // { message, sent, failed, total, errors }
+  const [newSubscriberEmail, setNewSubscriberEmail] = useState('')
+  const [addingSubscriber, setAddingSubscriber] = useState(false)
+  const [newsletterSubscriberSearch, setNewsletterSubscriberSearch] = useState('')
+  const [newsletterLimit] = useState(20)
+  const [newsletterOffset, setNewsletterOffset] = useState(0)
+  const [newsletterTotal, setNewsletterTotal] = useState(0)
+  const [newsletterHasMore, setNewsletterHasMore] = useState(false)
+  const NEWSLETTER_STORAGE_KEY = 'adminpanel_newsletter_subscribers'
+
   // Scroll to bottom of messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -320,6 +340,13 @@ function App() {
       fetchPromotionalBanners()
     }
   }, [isAuthenticated, activeMenu, productMediaTab])
+
+  // Fetch newsletter subscribers when on newsletters menu or pagination changes
+  useEffect(() => {
+    if (isAuthenticated && activeMenu === 'newsletters') {
+      fetchNewsletterSubscribers()
+    }
+  }, [isAuthenticated, activeMenu, newsletterOffset])
 
   // Fetch chat users when on messages menu
   useEffect(() => {
@@ -864,6 +891,103 @@ function App() {
     }
   }
 
+  // Fetch newsletter subscribers from API (GET /api/admin/newsletter with pagination)
+  const fetchNewsletterSubscribers = async () => {
+    setNewsletterSubscribersLoading(true)
+    setNewsletterSubscribersError(null)
+    try {
+      const params = new URLSearchParams({
+        limit: String(newsletterLimit),
+        offset: String(newsletterOffset),
+        sortOrder: 'desc'
+      })
+      const data = await apiCall(`/api/admin/newsletter?${params}`)
+      const list = data.subscribers || []
+      const normalized = list.map((s, i) => ({
+        id: s.id || `sub-${i}`,
+        email: typeof s === 'string' ? s : (s.email || s),
+        subscribedAt: s.created_at || s.subscribedAt || s.subscribed_at || s.createdAt || new Date().toISOString()
+      }))
+      setNewsletterSubscribers(normalized)
+      setNewsletterTotal(data.total != null ? data.total : normalized.length)
+      setNewsletterHasMore(Boolean(data.hasMore))
+    } catch (error) {
+      setNewsletterSubscribers([])
+      setNewsletterSubscribersError(error.message || 'Could not load subscribers.')
+      setNewsletterTotal(0)
+      setNewsletterHasMore(false)
+    } finally {
+      setNewsletterSubscribersLoading(false)
+    }
+  }
+
+  const addNewsletterSubscriber = async () => {
+    const email = (newSubscriberEmail || '').trim()
+    if (!email) return
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setNewsletterSubscribersError('Please enter a valid email address.')
+      return
+    }
+    setAddingSubscriber(true)
+    setNewsletterSubscribersError(null)
+    try {
+      await apiCall('/api/admin/newsletters/subscribers', {
+        method: 'POST',
+        body: JSON.stringify({ email })
+      })
+      setNewSubscriberEmail('')
+      fetchNewsletterSubscribers()
+    } catch (error) {
+      const stored = localStorage.getItem(NEWSLETTER_STORAGE_KEY)
+      const parsed = stored ? JSON.parse(stored) : []
+      const list = Array.isArray(parsed) ? parsed : []
+      if (list.some(s => (s.email || s).toLowerCase() === email.toLowerCase())) {
+        setNewsletterSubscribersError('This email is already subscribed.')
+        setAddingSubscriber(false)
+        return
+      }
+      const newSub = { id: `local-${Date.now()}`, email, subscribedAt: new Date().toISOString() }
+      const updated = [...list, newSub]
+      localStorage.setItem(NEWSLETTER_STORAGE_KEY, JSON.stringify(updated))
+      setNewsletterSubscribers(updated)
+      setNewSubscriberEmail('')
+      setNewsletterSubscribersError(null)
+    } finally {
+      setAddingSubscriber(false)
+    }
+  }
+
+  const sendNewsletter = async () => {
+    const subject = (sendNewsletterSubject || '').trim()
+    const html = (sendNewsletterBody || '').trim()
+    if (!subject) {
+      setSendNewsletterError('Please enter a subject.')
+      return
+    }
+    if (!html) {
+      setSendNewsletterError('Please enter the email content (HTML supported).')
+      return
+    }
+    setSendNewsletterSending(true)
+    setSendNewsletterError(null)
+    setSendNewsletterSuccess(null)
+    setSendNewsletterResponse(null)
+    try {
+      const data = await apiCall('/api/admin/newsletter/send', {
+        method: 'POST',
+        body: JSON.stringify({ subject, html })
+      })
+      setSendNewsletterResponse(data)
+      setSendNewsletterSuccess(data.message || `Newsletter sent to ${data.sent ?? 0} subscriber(s).`)
+      setSendNewsletterSubject('')
+      setSendNewsletterBody('')
+    } catch (error) {
+      setSendNewsletterError(error.message || 'Failed to send newsletter.')
+    } finally {
+      setSendNewsletterSending(false)
+    }
+  }
+
   // Fetch promotional banners
   const fetchPromotionalBanners = async () => {
     setPromotionalBannersLoading(true)
@@ -1392,6 +1516,19 @@ function App() {
                 </svg>
               </div>
               Messages
+            </a>
+            <a 
+              href="#newsletters" 
+              className={`menu-item ${activeMenu === 'newsletters' ? 'active' : ''}`}
+              onClick={(e) => { e.preventDefault(); setActiveMenu('newsletters'); }}
+            >
+              <div className="menu-item-icon">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M2 4C2 3.46957 2.21071 2.96086 2.58579 2.58579C2.96086 2.21071 3.46957 2 4 2H16C16.5304 2 17.0391 2.21071 17.4142 2.58579C17.7893 2.96086 18 3.46957 18 4V16C18 16.5304 17.7893 17.0391 17.4142 17.4142C17.0391 17.7893 16.5304 18 16 18H4C3.46957 18 2.96086 17.7893 2.58579 17.4142C2.21071 17.0391 2 16.5304 2 16V4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M2 6L10 11L18 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              News Letters
             </a>
           </div>
 
@@ -3978,6 +4115,248 @@ function App() {
               )}
             </div>
           </div>
+        </div>
+        )}
+
+        {activeMenu === 'newsletters' && (
+        <div className="dashboard-content">
+          <h1 className="dashboard-title">News Letters</h1>
+          <p className="dashboard-subtitle" style={{ color: '#6b7280', marginTop: '0.5rem' }}>Manage subscribers and send newsletters.</p>
+
+          <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1.5rem', marginBottom: '1.5rem', borderBottom: '1px solid #e5e7eb' }}>
+            <button
+              onClick={() => { setNewsletterTab('subscribers'); setSendNewsletterError(null); setSendNewsletterSuccess(null); }}
+              style={{
+                padding: '0.75rem 1.25rem',
+                border: 'none',
+                background: newsletterTab === 'subscribers' ? '#10b981' : 'transparent',
+                color: newsletterTab === 'subscribers' ? 'white' : '#6b7280',
+                fontWeight: '500',
+                cursor: 'pointer',
+                borderBottom: newsletterTab === 'subscribers' ? '2px solid #059669' : '2px solid transparent',
+                marginBottom: '-1px'
+              }}
+            >
+              Subscribers
+            </button>
+            <button
+              onClick={() => { setNewsletterTab('send'); setNewsletterSubscribersError(null); }}
+              style={{
+                padding: '0.75rem 1.25rem',
+                border: 'none',
+                background: newsletterTab === 'send' ? '#10b981' : 'transparent',
+                color: newsletterTab === 'send' ? 'white' : '#6b7280',
+                fontWeight: '500',
+                cursor: 'pointer',
+                borderBottom: newsletterTab === 'send' ? '2px solid #059669' : '2px solid transparent',
+                marginBottom: '-1px'
+              }}
+            >
+              Send Newsletter
+            </button>
+          </div>
+
+          {newsletterTab === 'subscribers' && (
+            <>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
+                <input
+                  type="email"
+                  placeholder="Add subscriber email"
+                  value={newSubscriberEmail}
+                  onChange={(e) => setNewSubscriberEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addNewsletterSubscriber()}
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    minWidth: '220px'
+                  }}
+                />
+                <button
+                  onClick={addNewsletterSubscriber}
+                  disabled={addingSubscriber}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: '500',
+                    cursor: addingSubscriber ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {addingSubscriber ? 'Adding…' : 'Add subscriber'}
+                </button>
+                <input
+                  type="text"
+                  placeholder="Search subscribers…"
+                  value={newsletterSubscriberSearch}
+                  onChange={(e) => setNewsletterSubscriberSearch(e.target.value)}
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    minWidth: '200px',
+                    marginLeft: 'auto'
+                  }}
+                />
+              </div>
+              {newsletterSubscribersError && (
+                <div style={{ padding: '0.75rem', marginBottom: '1rem', background: '#fef2f2', color: '#991b1b', borderRadius: '8px', fontSize: '0.875rem' }}>
+                  {newsletterSubscribersError}
+                </div>
+              )}
+              <div className="customer-table-card">
+                {newsletterSubscribersLoading ? (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Loading subscribers…</div>
+                ) : (
+                  <>
+                    <table className="customer-table">
+                      <thead>
+                        <tr>
+                          <th>Email</th>
+                          <th>Subscribed</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {newsletterSubscribers
+                          .filter(s => !newsletterSubscriberSearch.trim() || (s.email || '').toLowerCase().includes(newsletterSubscriberSearch.trim().toLowerCase()))
+                          .map((sub) => (
+                            <tr key={sub.id}>
+                              <td>{sub.email}</td>
+                              <td style={{ color: '#6b7280', fontSize: '0.8125rem' }}>
+                                {sub.subscribedAt ? new Date(sub.subscribedAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                    {newsletterSubscribers.filter(s => !newsletterSubscriberSearch.trim() || (s.email || '').toLowerCase().includes(newsletterSubscriberSearch.trim().toLowerCase())).length === 0 && (
+                      <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                        No subscribers yet.
+                      </div>
+                    )}
+                    {(newsletterTotal > 0 || newsletterSubscribers.length > 0) && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+                        <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                          Showing {newsletterOffset + 1}–{newsletterOffset + newsletterSubscribers.length} of {newsletterTotal}
+                        </span>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            onClick={() => setNewsletterOffset(Math.max(0, newsletterOffset - newsletterLimit))}
+                            disabled={newsletterOffset === 0 || newsletterSubscribersLoading}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '8px',
+                              background: newsletterOffset === 0 ? '#f3f4f6' : 'white',
+                              color: newsletterOffset === 0 ? '#9ca3af' : '#374151',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              cursor: newsletterOffset === 0 ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            Previous
+                          </button>
+                          <button
+                            onClick={() => setNewsletterOffset(newsletterOffset + newsletterLimit)}
+                            disabled={!newsletterHasMore || newsletterSubscribersLoading}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '8px',
+                              background: !newsletterHasMore ? '#f3f4f6' : 'white',
+                              color: !newsletterHasMore ? '#9ca3af' : '#374151',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              cursor: !newsletterHasMore ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </>
+          )}
+
+          {newsletterTab === 'send' && (
+            <div className="customer-table-card" style={{ maxWidth: '720px' }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>Subject</label>
+                <input
+                  type="text"
+                  placeholder="Newsletter subject"
+                  value={sendNewsletterSubject}
+                  onChange={(e) => setSendNewsletterSubject(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem'
+                  }}
+                />
+              </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>Content (HTML)</label>
+                <textarea
+                  placeholder="<h1>Hello!</h1><p>Thanks for subscribing. Write your content here…</p>"
+                  value={sendNewsletterBody}
+                  onChange={(e) => setSendNewsletterBody(e.target.value)}
+                  rows={10}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+              <p style={{ fontSize: '0.8125rem', color: '#6b7280', marginBottom: '1rem' }}>
+                This will be sent to all {newsletterTotal > 0 ? newsletterTotal : newsletterSubscribers.length} subscriber(s).
+              </p>
+              {sendNewsletterError && (
+                <div style={{ padding: '0.75rem', marginBottom: '1rem', background: '#fef2f2', color: '#991b1b', borderRadius: '8px', fontSize: '0.875rem' }}>
+                  {sendNewsletterError}
+                </div>
+              )}
+              {sendNewsletterSuccess && (
+                <div style={{ padding: '0.75rem', marginBottom: '1rem', background: '#f0fdf4', color: '#166534', borderRadius: '8px', fontSize: '0.875rem' }}>
+                  {sendNewsletterSuccess}
+                  {sendNewsletterResponse?.errors?.length > 0 && (
+                    <ul style={{ marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.25rem' }}>
+                      {sendNewsletterResponse.errors.map((err, i) => (
+                        <li key={i}>{err.email}: {err.error}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              <button
+                onClick={sendNewsletter}
+                disabled={sendNewsletterSending || (newsletterTotal === 0 && newsletterSubscribers.length === 0)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: (sendNewsletterSending || (newsletterTotal === 0 && newsletterSubscribers.length === 0)) ? '#9ca3af' : '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '500',
+                  cursor: (sendNewsletterSending || (newsletterTotal === 0 && newsletterSubscribers.length === 0)) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {sendNewsletterSending ? 'Sending…' : 'Send to all subscribers'}
+              </button>
+            </div>
+          )}
         </div>
         )}
 
